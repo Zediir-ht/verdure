@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { enrichPlant } from '../services/plantEnrichment'
 import { analyseRisks } from '../services/weatherRiskEngine'
 import { fetchWeather, DEFAULT_COORDS } from '../services/weather'
@@ -24,7 +24,7 @@ function scheduleRemoteSync(value) {
 
 const hybridStorage = {
   async getItem(name) {
-    // Prefer remote (may be updated from another device)
+    // Prefer remote (may be more recent — e.g. updated from another device)
     try {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 4000)
@@ -32,14 +32,16 @@ const hybridStorage = {
       clearTimeout(timeout)
       if (res.ok) {
         const { data } = await res.json()
-        if (data) return data
+        // Supabase JSONB may return an object — stringify back for createJSONStorage
+        if (data != null) return typeof data === 'string' ? data : JSON.stringify(data)
       }
     } catch {
-      // network error or Supabase not yet configured → fall through
+      // network error or Supabase not configured → fall through to localStorage
     }
     return localStorage.getItem(name)
   },
   setItem(name, value) {
+    // value is a JSON string produced by createJSONStorage
     localStorage.setItem(name, value)
     scheduleRemoteSync(value)
   },
@@ -160,7 +162,7 @@ export const usePlantsStore = create(
     }),
     {
       name: 'verdure-store',
-      storage: hybridStorage,
+      storage: createJSONStorage(() => hybridStorage),
       partialize: (state) => ({
         plants: state.plants,
         weatherData: state.weatherData,
