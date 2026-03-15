@@ -8,11 +8,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const upstream = await fetch('https://trefle.io/api/auth/claim', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    })
+    const token = process.env.VITE_TREFLE_USER_TOKEN
+    if (!token) {
+      return res.status(500).json({ error: 'VITE_TREFLE_USER_TOKEN not configured on server' })
+    }
+
+    // Trefle requires the origin of the calling app to be whitelisted
+    const origin = req.headers.origin || req.headers.referer || ''
+
+    const url = `https://trefle.io/api/auth/claim?token=${token}&origin=${encodeURIComponent(origin)}`
+    const upstream = await fetch(url, { method: 'POST' })
     const data = await upstream.json()
     res.status(upstream.status).json(data)
   } catch (err) {
