@@ -4,6 +4,50 @@ import { enrichPlant } from '../services/plantEnrichment'
 import { analyseRisks } from '../services/weatherRiskEngine'
 import { fetchWeather, DEFAULT_COORDS } from '../services/weather'
 
+// ---------------------------------------------------------------------------
+// Hybrid storage: localStorage (fast, offline) + Supabase via /api/store (sync)
+// On startup  → try remote first, fall back to localStorage
+// On mutation → write localStorage immediately, sync remote after 2 s debounce
+// ---------------------------------------------------------------------------
+let _syncTimer = null
+
+function scheduleRemoteSync(value) {
+  clearTimeout(_syncTimer)
+  _syncTimer = setTimeout(() => {
+    fetch('/api/store', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: value }),
+    }).catch(() => {}) // non-fatal — next mutation will retry
+  }, 2000)
+}
+
+const hybridStorage = {
+  async getItem(name) {
+    // Prefer remote (may be updated from another device)
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch('/api/store', { signal: controller.signal })
+      clearTimeout(timeout)
+      if (res.ok) {
+        const { data } = await res.json()
+        if (data) return data
+      }
+    } catch {
+      // network error or Supabase not yet configured → fall through
+    }
+    return localStorage.getItem(name)
+  },
+  setItem(name, value) {
+    localStorage.setItem(name, value)
+    scheduleRemoteSync(value)
+  },
+  removeItem(name) {
+    localStorage.removeItem(name)
+  },
+}
+
 export const usePlantsStore = create(
   persist(
     (set, get) => ({
@@ -116,6 +160,7 @@ export const usePlantsStore = create(
     }),
     {
       name: 'verdure-store',
+      storage: hybridStorage,
       partialize: (state) => ({
         plants: state.plants,
         weatherData: state.weatherData,
