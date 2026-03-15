@@ -40,18 +40,29 @@ export function calculateHydricBalance(plant, weatherHistory = [], forecast = []
   const locationFactor = locationFactorMap[plant?.location] ?? 0.5
   const capacity = potCapacityMap[plant?.potSize] ?? potCapacityMap.medium
 
-  const allDays = [...weatherHistory, ...forecast]
-  const evapLoss = allDays.reduce((sum, d) => sum + Number(d.et0 || 0) * coeff, 0)
-  const rainGain = allDays.reduce((sum, d) => sum + Number(d.precipitation || 0) * locationFactor, 0)
+  // Only count consumption SINCE the last watering — so watering resets the bar
+  const lastWateredDate = plant?.lastWatered
+    ? new Date(new Date(plant.lastWatered).toDateString()) // midnight of that day
+    : null
+
+  const relevantHistory = lastWateredDate
+    ? weatherHistory.filter((d) => new Date(d.date) > lastWateredDate)
+    : weatherHistory
+
+  // Urgency reflects only what happened SINCE last watering (no forecast contamination)
+  const evapLoss = relevantHistory.reduce((sum, d) => sum + Number(d.et0 || 0) * coeff, 0)
+  const rainGain = relevantHistory.reduce((sum, d) => sum + Number(d.precipitation || 0) * locationFactor, 0)
 
   const balance = capacity - evapLoss + rainGain
   const normalizedDeficit = Math.max(0, Math.min(1, (capacity - balance) / capacity))
   const urgencyScore = Math.round(normalizedDeficit * 100)
   const needsWater = urgencyScore > 65
 
-  const projected = computeProjectedBalances(capacity, coeff, locationFactor, forecast)
+  // Forecast projection starts from current balance
+  const projected = computeProjectedBalances(balance, coeff, locationFactor, forecast)
   const triggerDay = projected.find((d) => d.balance < capacity * 0.35)
-  const nextWateringDate = triggerDay ? new Date(triggerDay.date) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+  const fallbackDays = plant?.wateringIntervalDays ?? (coeff <= 0.25 ? 14 : coeff <= 0.55 ? 7 : coeff <= 0.75 ? 5 : 3)
+  const nextWateringDate = triggerDay ? new Date(triggerDay.date) : new Date(Date.now() + fallbackDays * 24 * 60 * 60 * 1000)
 
   const rainComing = forecast.slice(0, 3).reduce((sum, d) => sum + Number(d.precipitation || 0), 0)
   const reasoning = needsWater

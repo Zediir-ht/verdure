@@ -1,5 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
+import RiskBanner from '../components/dashboard/RiskBanner'
 import PlantCard from '../components/PlantCard'
+import WeeklyImpact from '../components/weather/WeeklyImpact'
 import { calculateHydricBalance } from '../services/hydricBalance'
 import { usePlantsStore } from '../store/usePlantsStore'
 
@@ -8,6 +10,7 @@ export default function Dashboard() {
   const plants = usePlantsStore((s) => s.plants)
   const weatherData = usePlantsStore((s) => s.weatherData)
   const waterPlant = usePlantsStore((s) => s.waterPlant)
+  const waterAllPlants = usePlantsStore((s) => s.waterAllPlants)
 
   const enriched = plants
     .map((plant) => {
@@ -16,19 +19,24 @@ export default function Dashboard() {
     })
     .sort((a, b) => b.urgencyScore - a.urgencyScore)
 
-  const criticalCount = enriched.filter((item) => item.urgencyScore > 80).length
-
   return (
     <section className="page">
-      {criticalCount > 0 ? (
-        <div className="alert-banner">{criticalCount} plantes ont besoin d'eau maintenant</div>
-      ) : null}
+      <RiskBanner />
+
+      <WeeklyImpact />
 
       <div className="section-title-row">
         <h2>Mes plantes</h2>
-        <Link to="/add" className="link-cta">
-          Ajouter
-        </Link>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {plants.length > 0 && (
+            <button className="water-all-btn" onClick={waterAllPlants}>
+              💧 Tout arrosé !
+            </button>
+          )}
+          <Link to="/add" className="link-cta">
+            Ajouter
+          </Link>
+        </div>
       </div>
 
       {!plants.length ? (
@@ -39,9 +47,9 @@ export default function Dashboard() {
           </button>
         </div>
       ) : (
-        <div className="plant-grid">
+        <div className="plant-list">
           {enriched.map((item, idx) => (
-            <div key={item.plant.id} style={{ animationDelay: `${idx * 90}ms` }} className="stagger-in">
+            <div key={item.plant.id} className="stagger-in" style={{ animationDelay: `${idx * 80}ms` }}>
               <PlantCard
                 plant={item.plant}
                 urgencyScore={item.urgencyScore}
@@ -53,10 +61,7 @@ export default function Dashboard() {
           ))}
         </div>
       )}
-
-      <button className="fab" onClick={() => navigate('/add')} aria-label="Ajouter une plante">
-        +
-      </button>
     </section>
   )
 }
+

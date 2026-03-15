@@ -1,83 +1,138 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatRelativeDate } from '../utils/date'
 
-function scoreColor(score) {
-  if (score > 70) return 'var(--red)'
-  if (score > 40) return 'var(--amber)'
-  return 'var(--green)'
+function hydrationInfo(urgencyScore) {
+  const level = Math.max(0, 100 - urgencyScore)
+  if (level > 60) return { level, from: '#4ade80', to: '#16a34a', label: 'Bien hydratée', textColor: 'var(--green)' }
+  if (level > 30) return { level, from: '#fde68a', to: '#f59e0b', label: 'À surveiller', textColor: 'var(--amber)' }
+  return { level, from: '#fca5a5', to: '#ef4444', label: 'Assoiffée !', textColor: 'var(--red)' }
+}
+
+function WaterBar({ urgencyScore }) {
+  const { level, from, to } = hydrationInfo(urgencyScore)
+  const [width, setWidth] = useState(0)
+
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(level), 120)
+    return () => clearTimeout(t)
+  }, [level])
+
+  return (
+    <div className="water-bar-track">
+      <div
+        className="water-bar-fill"
+        style={{
+          width: `${width}%`,
+          background: `linear-gradient(90deg, ${from}, ${to})`,
+        }}
+      >
+        <div className="water-bar-shimmer" />
+      </div>
+    </div>
+  )
 }
 
 export default function PlantCard({ plant, urgencyScore, nextWateringDate, reasoning, onWater }) {
   const navigate = useNavigate()
-  const [touchStart, setTouchStart] = useState(0)
+  const [touchStart, setTouchStart] = useState(null)
   const [offset, setOffset] = useState(0)
-  const [drop, setDrop] = useState(false)
+  const [watering, setWatering] = useState(false)
+  const [drops, setDrops] = useState([])
 
-  const radius = 24
-  const circumference = 2 * Math.PI * radius
-  const dash = useMemo(() => circumference * (Math.max(0, Math.min(100, urgencyScore)) / 100), [urgencyScore, circumference])
+  const { level, label, textColor } = hydrationInfo(urgencyScore)
+  const dateLabel = formatRelativeDate(nextWateringDate)
+  const isUrgent = urgencyScore > 70
+  const isMedium = urgencyScore > 40
 
-  const handleTouchStart = (e) => {
-    setTouchStart(e.changedTouches[0].clientX)
-  }
-
+  const handleTouchStart = (e) => setTouchStart(e.changedTouches[0].clientX)
   const handleTouchMove = (e) => {
+    if (touchStart === null) return
     const delta = e.changedTouches[0].clientX - touchStart
-    if (delta < 0) {
-      setOffset(Math.max(delta, -110))
-    }
+    if (delta < 0) setOffset(Math.max(delta, -110))
+  }
+  const handleTouchEnd = () => {
+    if (offset < -80) triggerWater()
+    else if (Math.abs(offset) < 12) navigate(`/plant/${plant.id}`)
+    setOffset(0)
+    setTouchStart(null)
   }
 
-  const handleTouchEnd = () => {
-    if (offset < -80) {
-      setDrop(true)
-      onWater(plant.id)
-      setTimeout(() => setDrop(false), 700)
-    } else if (Math.abs(offset) < 12) {
-      navigate(`/plant/${plant.id}`)
-    }
-    setOffset(0)
+  const triggerWater = () => {
+    setWatering(true)
+    onWater(plant.id)
+    const newDrops = Array.from({ length: 6 }, (_, i) => ({
+      id: Date.now() + i,
+      x: 30 + Math.random() * 40,
+      delay: i * 80,
+    }))
+    setDrops(newDrops)
+    setTimeout(() => { setWatering(false); setDrops([]) }, 900)
   }
 
   return (
     <article
-      className="plant-card"
+      className={`plant-card-v2${watering ? ' watering' : ''}`}
       style={{ transform: `translateX(${offset}px)` }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onClick={() => navigate(`/plant/${plant.id}`)}
     >
-      {drop ? <span className="water-drop">💧</span> : null}
-      <div className="plant-head">
-        <span className="plant-emoji">{plant.emoji}</span>
-        <div>
-          <h3>{plant.name}</h3>
-          <span className="type-badge">{plant.type}</span>
+      {drops.map((d) => (
+        <span
+          key={d.id}
+          className="drop-burst"
+          style={{ left: `${d.x}%`, animationDelay: `${d.delay}ms` }}
+        >💧</span>
+      ))}
+
+      {/* Header */}
+      <div className="pcv2-header">
+        <div className="pcv2-emoji-wrap">
+          <span className="pcv2-emoji">{plant.emoji}</span>
+        </div>
+        <div className="pcv2-info">
+          <h3 className="pcv2-name">{plant.name}</h3>
+          <div className="pcv2-tags">
+            <span className="pcv2-tag">{plant.type}</span>
+            <span className="pcv2-tag pcv2-tag-loc">📍 {plant.location}</span>
+          </div>
+        </div>
+        <div className="pcv2-urgency-badge" style={{ color: textColor }}>
+          <span className="pcv2-urgency-dot" style={{ background: textColor }} />
+          {label}
         </div>
       </div>
 
-      <div className="card-row">
-        <svg width="64" height="64" viewBox="0 0 64 64" aria-label={`Urgence ${urgencyScore}%`}>
-          <circle cx="32" cy="32" r={radius} className="ring-bg" />
-          <circle
-            cx="32"
-            cy="32"
-            r={radius}
-            className="ring-value"
-            stroke={scoreColor(urgencyScore)}
-            strokeDasharray={`${dash} ${circumference - dash}`}
-          />
-          <text x="32" y="36" textAnchor="middle" className="ring-text">
-            {urgencyScore}
-          </text>
-        </svg>
-
-        <div className="plant-meta">
-          <p>Prochain arrosage: {formatRelativeDate(nextWateringDate)}</p>
-          <p className="reasoning">{reasoning}</p>
+      {/* Water bar */}
+      <div className="pcv2-bar-section">
+        <div className="pcv2-bar-header">
+          <span className="pcv2-bar-label">💧 Hydratation du sol</span>
+          <span className="pcv2-bar-pct" style={{ color: textColor }}>{level}%</span>
         </div>
+        <WaterBar urgencyScore={urgencyScore} />
+      </div>
+
+      {/* Footer */}
+      <div className="pcv2-footer">
+        <div
+          className="pcv2-date-pill"
+          style={{
+            background: isUrgent ? 'rgba(239,68,68,0.08)' : isMedium ? 'rgba(245,158,11,0.08)' : 'rgba(46,139,87,0.08)',
+            color: textColor,
+            borderColor: isUrgent ? 'rgba(239,68,68,0.25)' : isMedium ? 'rgba(245,158,11,0.25)' : 'rgba(46,139,87,0.25)',
+          }}
+        >
+          ⏱ {dateLabel}
+        </div>
+        <button
+          className="pcv2-water-btn"
+          onClick={(e) => { e.stopPropagation(); triggerWater() }}
+          aria-label="Arroser maintenant"
+        >
+          💧 J'arrose
+        </button>
       </div>
     </article>
   )

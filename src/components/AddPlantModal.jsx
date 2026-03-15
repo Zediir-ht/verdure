@@ -29,6 +29,7 @@ export default function AddPlantModal() {
   const [selected, setSelected] = useState(null)
   const [details, setDetails] = useState(null)
   const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState('')
 
   const [emoji, setEmoji] = useState('🪴')
   const [location, setLocation] = useState('interieur')
@@ -60,10 +61,13 @@ export default function AddPlantModal() {
   const onSelectPlant = async (item) => {
     setSelected(item)
     setDetails(null)
+    setDetailsError('')
     setDetailsLoading(true)
     try {
       const payload = await getPlantDetails(item.id)
       setDetails(payload)
+    } catch (e) {
+      setDetailsError(e.message || 'Impossible de charger les détails de la plante.')
     } finally {
       setDetailsLoading(false)
     }
@@ -85,6 +89,7 @@ export default function AddPlantModal() {
       type,
       trefleId: selected.id,
       wateringCoefficient: details.wateringCoefficient,
+      wateringIntervalDays: details.wateringIntervalDays ?? null,
       location,
       potSize,
       lastWatered: now,
@@ -138,9 +143,12 @@ export default function AddPlantModal() {
                 ? <em className="latin-name">{selected.latinName}</em>
                 : null}
               {detailsLoading ? <p>Chargement des détails…</p> : null}
+              {detailsError ? <p className="error">{detailsError}</p> : null}
               {details ? (
                 <div className="details-grid">
-                  <span className="detail-chip">💧 {details.watering}</span>
+                  {details.wateringIntervalDays
+                    ? <span className="detail-chip">💧 Tous les {details.wateringIntervalDays} jours</span>
+                    : <span className="detail-chip">💧 {details.watering}</span>}
                   {details.light !== null && details.light !== undefined
                     ? <span className="detail-chip">☀️ Lumière {details.light}/10</span>
                     : null}

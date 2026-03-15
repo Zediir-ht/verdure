@@ -1,5 +1,5 @@
 const WEATHER_ENDPOINT = 'https://api.open-meteo.com/v1/forecast'
-export const DEFAULT_COORDS = { lat: 44.35, lon: 2.57, city: 'Rodez' }
+export const DEFAULT_COORDS = { lat: 44.3516, lon: 2.5722, city: 'Rodez' }
 
 function buildDailyItems(daily = {}) {
   const {
@@ -9,6 +9,11 @@ function buildDailyItems(daily = {}) {
     temperature_2m_max = [],
     temperature_2m_min = [],
     precipitation_probability_max = [],
+    wind_speed_10m_max = [],
+    wind_gusts_10m_max = [],
+    weather_code = [],
+    sunshine_duration = [],
+    uv_index_max = [],
   } = daily
 
   return time.map((date, i) => ({
@@ -18,6 +23,11 @@ function buildDailyItems(daily = {}) {
     tempMax: Number(temperature_2m_max[i] ?? 0),
     tempMin: Number(temperature_2m_min[i] ?? 0),
     precipitationProbability: Number(precipitation_probability_max[i] ?? 0),
+    windSpeedMax: Number(wind_speed_10m_max[i] ?? 0),
+    windGustsMax: Number(wind_gusts_10m_max[i] ?? 0),
+    weatherCode: Number(weather_code[i] ?? 0),
+    sunshineDuration: Number(sunshine_duration[i] ?? 0),
+    uvIndexMax: Number(uv_index_max[i] ?? 0),
   }))
 }
 
@@ -46,10 +56,10 @@ export async function fetchWeather(lat = DEFAULT_COORDS.lat, lon = DEFAULT_COORD
     latitude: String(lat),
     longitude: String(lon),
     current:
-      'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,et0_fao_evapotranspiration',
-    hourly: 'soil_moisture_0_to_1cm',
+      'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,et0_fao_evapotranspiration,apparent_temperature',
+    hourly: 'soil_moisture_0_to_1cm,soil_temperature_0cm',
     daily:
-      'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
+      'precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,weather_code,sunshine_duration,uv_index_max',
     past_days: '3',
     forecast_days: '7',
     timezone: 'Europe/Paris',
@@ -68,10 +78,12 @@ export async function fetchWeather(lat = DEFAULT_COORDS.lat, lon = DEFAULT_COORD
   return {
     current: {
       temperature: Number(data.current?.temperature_2m ?? 0),
+      apparentTemperature: Number(data.current?.apparent_temperature ?? 0),
       humidity: Number(data.current?.relative_humidity_2m ?? 0),
       precipitation: Number(data.current?.precipitation ?? 0),
       weatherCode: Number(data.current?.weather_code ?? 0),
       windSpeed: Number(data.current?.wind_speed_10m ?? 0),
+      windGusts: Number(data.current?.wind_gusts_10m ?? 0),
       et0: Number(data.current?.et0_fao_evapotranspiration ?? 0),
       soilMoisture: pickCurrentSoilMoisture(data.hourly),
       time: data.current?.time,

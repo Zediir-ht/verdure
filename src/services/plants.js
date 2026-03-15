@@ -1,7 +1,7 @@
-const TREFLE_BASE = 'https://trefle.io/api/v1'
-const TREFLE_AUTH = 'https://trefle.io/api/auth/claim'
-const USER_TOKEN = 'usr-5pAQ63LD52r54zpRDqGJCsOXEZJAunoLFx7W_ebBhfE'
-const CLAUDE_URL = 'https://api.anthropic.com/v1/messages'
+const TREFLE_BASE = '/trefle-api'
+const TREFLE_AUTH = '/trefle-auth'
+const USER_TOKEN = import.meta.env.VITE_TREFLE_USER_TOKEN
+const CLAUDE_URL = '/anthropic/v1/messages'
 const JWT_CACHE_KEY = 'verdure:trefle:jwt'
 
 // ---------------------------------------------------------------------------
@@ -9,6 +9,10 @@ const JWT_CACHE_KEY = 'verdure:trefle:jwt'
 // ---------------------------------------------------------------------------
 
 async function getTrefleJwt() {
+  if (!USER_TOKEN) {
+    throw new Error('Token Trefle manquant: ajoute VITE_TREFLE_USER_TOKEN dans .env')
+  }
+
   // Return cached JWT if still valid (Trefle JWTs last ~1 hour)
   const cached = cacheGet(JWT_CACHE_KEY)
   if (cached?.token && cached.expiresAt > Date.now() + 60_000) {
@@ -71,6 +75,17 @@ function cacheSet(key, value) {
 // Claude fallback — fetch watering data when Trefle has none
 // ---------------------------------------------------------------------------
 
+// Map Trefle moisture_use → interval in days
+const moistureIntervalMap = {
+  Low: 14,
+  Medium: 7,
+  High: 4,
+}
+
+export function mapMoistureToIntervalDays(moistureUse) {
+  return moistureIntervalMap[moistureUse] ?? null
+}
+
 async function fetchWateringFromClaude(latinName) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
   if (!apiKey) return null
@@ -89,15 +104,14 @@ async function fetchWateringFromClaude(latinName) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
+        max_tokens: 256,
         messages: [
           {
             role: 'user',
             content:
-              `Give me the watering coefficient (0.0 to 1.0) and key care data ` +
-              `for ${latinName} in JSON format only, no extra text: ` +
-              `{ "wateringCoefficient": number, "droughtTolerant": boolean, ` +
-              `"frostHardy": boolean, "wateringTips": string }`,
+              `Give me the watering data for ${latinName} in JSON format only, no extra text: ` +
+              `{ "wateringCoefficient": number (0.0-1.0), "wateringIntervalDays": number (days between waterings for an indoor pot), ` +
+              `"droughtTolerant": boolean, "frostHardy": boolean, "wateringTips": string }`,
           },
         ],
       }),
@@ -180,18 +194,21 @@ export async function getPlantDetails(id) {
   const latinName = data.scientific_name || ''
 
   let wateringCoefficient = mapMoistureToCoefficient(moistureUse)
+  let wateringIntervalDays = mapMoistureToIntervalDays(moistureUse)
   let claudeData = null
 
   // Fallback to Claude when Trefle has no moisture data
-  if (wateringCoefficient === null && latinName) {
+  if ((wateringCoefficient === null || wateringIntervalDays === null) && latinName) {
     claudeData = await fetchWateringFromClaude(latinName)
-    wateringCoefficient = claudeData?.wateringCoefficient ?? 0.5
+    wateringCoefficient = claudeData?.wateringCoefficient ?? wateringCoefficient ?? 0.5
+    wateringIntervalDays = claudeData?.wateringIntervalDays ?? wateringIntervalDays ?? 7
   }
 
   const result = {
     // Watering
     watering: moistureUse ?? (claudeData ? 'via IA' : 'Non renseigné'),
     wateringCoefficient,
+    wateringIntervalDays,
     wateringTips: claudeData?.wateringTips ?? null,
     // Care
     droughtTolerant: claudeData?.droughtTolerant ?? (droughtTolerance === 'High' || droughtTolerance === 'Very High'),

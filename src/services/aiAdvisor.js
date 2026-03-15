@@ -1,4 +1,4 @@
-const API_URL = 'https://api.anthropic.com/v1/messages'
+const API_URL = '/anthropic/v1/messages'
 const MODEL = 'claude-sonnet-4-20250514'
 const SYSTEM_PROMPT =
   "Tu es un expert horticulteur bienveillant. Tu analyses les données météo et le bilan hydrique de chaque plante pour donner des conseils précis et personnalisés. Réponds toujours en français, de façon concise et pratique."
