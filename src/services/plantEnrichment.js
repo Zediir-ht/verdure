@@ -1,7 +1,6 @@
 // Plant enrichment service: combines Trefle + Claude to build complete plant profiles
 const TREFLE_BASE = '/trefle-api'
 const TREFLE_AUTH = '/trefle-auth'
-const USER_TOKEN = import.meta.env.VITE_TREFLE_USER_TOKEN
 const CLAUDE_URL = '/anthropic/v1/messages'
 const CACHE_PREFIX = 'enriched_'
 
@@ -42,21 +41,21 @@ function sessionSet(key, value) {
 // ─── Trefle JWT ──────────────────────────────────────────────────────────────
 
 async function getTrefleJwt() {
-  if (!USER_TOKEN) return null
   const JWT_KEY = 'verdure:trefle:jwt'
   const cached = sessionGet(JWT_KEY)
   if (cached?.token && cached.expiresAt > Date.now() + 60_000) return cached.token
 
-  const origin = window.location.origin
-  const res = await fetch(`${TREFLE_AUTH}?token=${USER_TOKEN}&origin=${encodeURIComponent(origin)}`, {
-    method: 'POST',
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  const jwt = data.token
-  if (!jwt) return null
-  sessionSet(JWT_KEY, { token: jwt, expiresAt: Date.now() + 55 * 60 * 1000 })
-  return jwt
+  try {
+    const res = await fetch(TREFLE_AUTH, { method: 'POST' })
+    if (!res.ok) return null
+    const data = await res.json()
+    const jwt = data.token
+    if (!jwt) return null
+    sessionSet(JWT_KEY, { token: jwt, expiresAt: Date.now() + 55 * 60 * 1000 })
+    return jwt
+  } catch {
+    return null
+  }
 }
 
 // ─── Trefle fetch ─────────────────────────────────────────────────────────────

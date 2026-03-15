@@ -1,39 +1,26 @@
 const TREFLE_BASE = '/trefle-api'
 const TREFLE_AUTH = '/trefle-auth'
-const USER_TOKEN = import.meta.env.VITE_TREFLE_USER_TOKEN
 const CLAUDE_URL = '/anthropic/v1/messages'
 const JWT_CACHE_KEY = 'verdure:trefle:jwt'
 
 // ---------------------------------------------------------------------------
-// Trefle JWT claim — browser requests require a short-lived JWT, not the raw token
+// Trefle token — proxy handles auth server-side, no client token needed
 // ---------------------------------------------------------------------------
 
 async function getTrefleJwt() {
-  if (!USER_TOKEN) {
-    throw new Error('Token Trefle manquant: ajoute VITE_TREFLE_USER_TOKEN dans .env')
-  }
-
-  // Return cached JWT if still valid (Trefle JWTs last ~1 hour)
+  // Return cached token if still valid
   const cached = cacheGet(JWT_CACHE_KEY)
   if (cached?.token && cached.expiresAt > Date.now() + 60_000) {
     return cached.token
   }
 
-  const origin = window.location.origin
-  const res = await fetch(
-    `${TREFLE_AUTH}?token=${USER_TOKEN}&origin=${encodeURIComponent(origin)}`,
-    { method: 'POST' }
-  )
-
-  if (!res.ok) {
-    throw new Error(`Trefle auth failed (${res.status}). Vérifie que l'origine "${origin}" est enregistrée sur trefle.io/me.`)
-  }
+  const res = await fetch(TREFLE_AUTH, { method: 'POST' })
+  if (!res.ok) throw new Error(`Trefle auth failed (${res.status})`)
 
   const data = await res.json()
   const jwt = data.token
-  if (!jwt) throw new Error('Trefle n\'a pas retourné de JWT.')
+  if (!jwt) throw new Error('Trefle proxy did not return a token.')
 
-  // Cache for 55 minutes
   cacheSet(JWT_CACHE_KEY, { token: jwt, expiresAt: Date.now() + 55 * 60 * 1000 })
   return jwt
 }
