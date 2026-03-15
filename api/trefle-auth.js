@@ -1,3 +1,6 @@
+// The JWT claim flow requires whitelisting origins on trefle.io — not reliable.
+// Instead, return the raw user token directly. The trefle-api proxy injects it
+// server-side via ?token= so it never hits origin checks.
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -7,20 +10,11 @@ export default async function handler(req, res) {
     return res.status(204).end()
   }
 
-  try {
-    const token = process.env.VITE_TREFLE_USER_TOKEN
-    if (!token) {
-      return res.status(500).json({ error: 'VITE_TREFLE_USER_TOKEN not configured on server' })
-    }
-
-    // Trefle requires the origin of the calling app to be whitelisted
-    const origin = req.headers.origin || req.headers.referer || ''
-
-    const url = `https://trefle.io/api/auth/claim?token=${token}&origin=${encodeURIComponent(origin)}`
-    const upstream = await fetch(url, { method: 'POST' })
-    const data = await upstream.json()
-    res.status(upstream.status).json(data)
-  } catch (err) {
-    res.status(502).json({ error: 'Trefle auth proxy error', detail: err.message })
+  const token = process.env.VITE_TREFLE_USER_TOKEN
+  if (!token) {
+    return res.status(500).json({ error: 'VITE_TREFLE_USER_TOKEN not configured on server' })
   }
+
+  // Return the token directly — the API proxy will use it server-side
+  res.status(200).json({ token })
 }

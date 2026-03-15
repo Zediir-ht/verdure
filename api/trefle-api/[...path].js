@@ -8,15 +8,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    // req.url is like /api/trefle-api/plants?token=... — strip prefix to get Trefle path
-    const trefleUrl = 'https://trefle.io/api/v1' + req.url.replace(/^\/api\/trefle-api/, '')
+    const serverToken = process.env.VITE_TREFLE_USER_TOKEN
+    if (!serverToken) {
+      return res.status(500).json({ error: 'VITE_TREFLE_USER_TOKEN not configured on server' })
+    }
 
-    const upstream = await fetch(trefleUrl, {
-      headers: {
-        Authorization: req.headers.authorization || '',
-        'Content-Type': 'application/json',
-      },
-    })
+    // Strip our proxy prefix to get the Trefle path + existing query params
+    const trefleRelative = req.url.replace(/^\/api\/trefle-api/, '')
+    const separator = trefleRelative.includes('?') ? '&' : '?'
+    // Inject the token server-side — no origin whitelist needed
+    const trefleUrl = `https://trefle.io/api/v1${trefleRelative}${separator}token=${serverToken}`
+
+    const upstream = await fetch(trefleUrl)
     const data = await upstream.json()
     res.status(upstream.status).json(data)
   } catch (err) {
