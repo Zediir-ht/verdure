@@ -45,15 +45,21 @@ export default function PlantCard({ plant, urgencyScore, nextWateringDate, reaso
   const isUrgent = urgencyScore > 70
   const isMedium = urgencyScore > 40
 
-  const handleTouchStart = (e) => setTouchStart(e.changedTouches[0].clientX)
+  const handleTouchStart = (e) => {
+    const t = e.changedTouches[0]
+    setTouchStart({ x: t.clientX, y: t.clientY })
+  }
   const handleTouchMove = (e) => {
-    if (touchStart === null) return
-    const delta = e.changedTouches[0].clientX - touchStart
-    if (delta < 0) setOffset(Math.max(delta, -110))
+    if (!touchStart) return
+    const dx = e.changedTouches[0].clientX - touchStart.x
+    const dy = e.changedTouches[0].clientY - touchStart.y
+    // Vertical gesture — let the browser scroll, don't interfere
+    if (Math.abs(dy) > Math.abs(dx)) return
+    if (dx < 0) setOffset(Math.max(dx, -110))
   }
   const handleTouchEnd = () => {
     if (offset < -80) triggerWater()
-    else if (Math.abs(offset) < 12) navigate(`/plant/${plant.id}`)
+    else if (touchStart && Math.abs(offset) < 12) navigate(`/plant/${plant.id}`)
     setOffset(0)
     setTouchStart(null)
   }
