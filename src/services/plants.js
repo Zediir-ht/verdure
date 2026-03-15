@@ -1,29 +1,6 @@
 const TREFLE_BASE = '/trefle-api'
-const TREFLE_AUTH = '/trefle-auth'
 const CLAUDE_URL = '/anthropic/v1/messages'
-const JWT_CACHE_KEY = 'verdure:trefle:jwt'
-
-// ---------------------------------------------------------------------------
-// Trefle token — proxy handles auth server-side, no client token needed
-// ---------------------------------------------------------------------------
-
-async function getTrefleJwt() {
-  // Return cached token if still valid
-  const cached = cacheGet(JWT_CACHE_KEY)
-  if (cached?.token && cached.expiresAt > Date.now() + 60_000) {
-    return cached.token
-  }
-
-  const res = await fetch(TREFLE_AUTH, { method: 'POST' })
-  if (!res.ok) throw new Error(`Trefle auth failed (${res.status})`)
-
-  const data = await res.json()
-  const jwt = data.token
-  if (!jwt) throw new Error('Trefle proxy did not return a token.')
-
-  cacheSet(JWT_CACHE_KEY, { token: jwt, expiresAt: Date.now() + 55 * 60 * 1000 })
-  return jwt
-}
+// No token needed on the client — the Vercel proxy injects it server-side
 
 const moistureMap = {
   Low: 0.2,
@@ -129,14 +106,8 @@ export async function searchPlants(query) {
   const cached = cacheGet(cacheKey)
   if (cached) return cached
 
-  const jwt = await getTrefleJwt()
-  const params = new URLSearchParams({ q: query.trim(), token: jwt })
-  const res = await fetch(`${TREFLE_BASE}/plants/search?${params}`)
-
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('JWT Trefle expiré, réessaie.')
-    throw new Error('Recherche de plante indisponible.')
-  }
+  const res = await fetch(`${TREFLE_BASE}/plants/search?q=${encodeURIComponent(query.trim())}`)
+  if (!res.ok) throw new Error('Recherche de plante indisponible.')
 
   const payload = await res.json()
   const items = (payload?.data ?? []).map((p) => ({
@@ -160,13 +131,8 @@ export async function getPlantDetails(id) {
   const cached = cacheGet(cacheKey)
   if (cached) return cached
 
-  const jwt = await getTrefleJwt()
-  const params = new URLSearchParams({ token: jwt })
-  const res = await fetch(`${TREFLE_BASE}/plants/${id}?${params}`)
-
-  if (!res.ok) {
-    throw new Error('Impossible de charger les détails de la plante.')
-  }
+  const res = await fetch(`${TREFLE_BASE}/plants/${id}`)
+  if (!res.ok) throw new Error('Impossible de charger les détails de la plante.')
 
   const payload = await res.json()
   const data = payload?.data ?? {}

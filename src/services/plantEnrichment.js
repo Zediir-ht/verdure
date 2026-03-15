@@ -1,7 +1,7 @@
 // Plant enrichment service: combines Trefle + Claude to build complete plant profiles
 const TREFLE_BASE = '/trefle-api'
-const TREFLE_AUTH = '/trefle-auth'
 const CLAUDE_URL = '/anthropic/v1/messages'
+// No token needed on the client — the Vercel proxy injects it server-side
 const CACHE_PREFIX = 'enriched_'
 
 // ─── Persistent localStorage cache ──────────────────────────────────────────
@@ -40,40 +40,19 @@ function sessionSet(key, value) {
 
 // ─── Trefle JWT ──────────────────────────────────────────────────────────────
 
-async function getTrefleJwt() {
-  const JWT_KEY = 'verdure:trefle:jwt'
-  const cached = sessionGet(JWT_KEY)
-  if (cached?.token && cached.expiresAt > Date.now() + 60_000) return cached.token
-
-  try {
-    const res = await fetch(TREFLE_AUTH, { method: 'POST' })
-    if (!res.ok) return null
-    const data = await res.json()
-    const jwt = data.token
-    if (!jwt) return null
-    sessionSet(JWT_KEY, { token: jwt, expiresAt: Date.now() + 55 * 60 * 1000 })
-    return jwt
-  } catch {
-    return null
-  }
-}
-
 // ─── Trefle fetch ─────────────────────────────────────────────────────────────
 
 async function fetchTrefleData(latinName) {
   if (!latinName) return null
   try {
-    const jwt = await getTrefleJwt()
-    if (!jwt) return null
-    const params = new URLSearchParams({ q: latinName.trim(), token: jwt })
-    const res = await fetch(`${TREFLE_BASE}/plants/search?${params}`)
+    const res = await fetch(`${TREFLE_BASE}/plants/search?q=${encodeURIComponent(latinName.trim())}`)
     if (!res.ok) return null
     const payload = await res.json()
     const plant = payload?.data?.[0]
     if (!plant) return null
 
     // Fetch full detail for growth data
-    const detailRes = await fetch(`${TREFLE_BASE}/plants/${plant.id}?token=${jwt}`)
+    const detailRes = await fetch(`${TREFLE_BASE}/plants/${plant.id}`)
     if (!detailRes.ok) return null
     const detail = await detailRes.json()
     const d = detail?.data ?? {}
