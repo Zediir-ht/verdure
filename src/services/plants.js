@@ -1,6 +1,6 @@
-const TREFLE_BASE = '/trefle-api'
+const TREFLE_BASE = '/api/trefle'
 const CLAUDE_URL = '/anthropic/v1/messages'
-// No token needed on the client — the Vercel proxy injects it server-side
+// Token injected server-side by Vercel function
 
 const moistureMap = {
   Low: 0.2,
@@ -106,7 +106,7 @@ export async function searchPlants(query) {
   const cached = cacheGet(cacheKey)
   if (cached) return cached
 
-  const res = await fetch(`${TREFLE_BASE}/plants/search?q=${encodeURIComponent(query.trim())}`)
+  const res = await fetch(`${TREFLE_BASE}?q=${encodeURIComponent(query.trim())}`)
   if (!res.ok) throw new Error('Recherche de plante indisponible.')
 
   const payload = await res.json()
@@ -131,7 +131,7 @@ export async function getPlantDetails(id) {
   const cached = cacheGet(cacheKey)
   if (cached) return cached
 
-  const res = await fetch(`${TREFLE_BASE}/plants/${id}`)
+  const res = await fetch(`${TREFLE_BASE}?id=${id}`)
   if (!res.ok) throw new Error('Impossible de charger les détails de la plante.')
 
   const payload = await res.json()

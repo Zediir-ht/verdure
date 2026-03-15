@@ -1,7 +1,7 @@
 // Plant enrichment service: combines Trefle + Claude to build complete plant profiles
-const TREFLE_BASE = '/trefle-api'
+const TREFLE_BASE = '/api/trefle'
 const CLAUDE_URL = '/anthropic/v1/messages'
-// No token needed on the client — the Vercel proxy injects it server-side
+// Token injected server-side by Vercel function
 const CACHE_PREFIX = 'enriched_'
 
 // ─── Persistent localStorage cache ──────────────────────────────────────────
@@ -45,14 +45,14 @@ function sessionSet(key, value) {
 async function fetchTrefleData(latinName) {
   if (!latinName) return null
   try {
-    const res = await fetch(`${TREFLE_BASE}/plants/search?q=${encodeURIComponent(latinName.trim())}`)
+    const res = await fetch(`${TREFLE_BASE}?q=${encodeURIComponent(latinName.trim())}`)
     if (!res.ok) return null
     const payload = await res.json()
     const plant = payload?.data?.[0]
     if (!plant) return null
 
     // Fetch full detail for growth data
-    const detailRes = await fetch(`${TREFLE_BASE}/plants/${plant.id}`)
+    const detailRes = await fetch(`${TREFLE_BASE}?id=${plant.id}`)
     if (!detailRes.ok) return null
     const detail = await detailRes.json()
     const d = detail?.data ?? {}
