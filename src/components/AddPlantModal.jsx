@@ -73,12 +73,17 @@ export default function AddPlantModal() {
     if (!selected || !details) return
 
     const now = new Date().toISOString()
+    // Derive a rough plant type from drought tolerance / coefficient
+    const coeff = details.wateringCoefficient ?? 0.5
+    const type = coeff <= 0.25 ? 'cactus' : coeff >= 0.8 ? 'tropical' : 'flower'
+
     addPlant({
       id: crypto.randomUUID(),
       name: selected.name,
+      latinName: selected.latinName || details.latinName || '',
       emoji,
-      type: details.watering?.toLowerCase()?.includes('minimum') ? 'cactus' : 'tropical',
-      perenualId: selected.id,
+      type,
+      trefleId: selected.id,
       wateringCoefficient: details.wateringCoefficient,
       location,
       potSize,
@@ -114,7 +119,12 @@ export default function AddPlantModal() {
                 <li key={item.id}>
                   <button type="button" className="result-item" onClick={() => onSelectPlant(item)}>
                     {item.thumbnail ? <img src={item.thumbnail} alt="" /> : <span className="thumb-empty">🌿</span>}
-                    <span>{item.name}</span>
+                    <span className="result-names">
+                      <strong>{item.name}</strong>
+                      {item.latinName && item.latinName !== item.name
+                        ? <em className="latin-name">{item.latinName}</em>
+                        : null}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -124,13 +134,33 @@ export default function AddPlantModal() {
           <>
             <div className="selected-plant">
               <h3>{selected.name}</h3>
+              {selected.latinName && selected.latinName !== selected.name
+                ? <em className="latin-name">{selected.latinName}</em>
+                : null}
               {detailsLoading ? <p>Chargement des détails…</p> : null}
               {details ? (
-                <>
-                  <p className="text-dim">Arrosage: {details.watering}</p>
-                  <p className="text-dim">Ensoleillement: {(details.sunlight || []).join(', ') || 'Variable'}</p>
-                </>
+                <div className="details-grid">
+                  <span className="detail-chip">💧 {details.watering}</span>
+                  {details.light !== null && details.light !== undefined
+                    ? <span className="detail-chip">☀️ Lumière {details.light}/10</span>
+                    : null}
+                  {details.avgHeightCm
+                    ? <span className="detail-chip">📏 {details.avgHeightCm} cm</span>
+                    : null}
+                  {details.droughtTolerant
+                    ? <span className="detail-chip">🌵 Résistant sécheresse</span>
+                    : null}
+                  {details.frostHardy
+                    ? <span className="detail-chip">❄️ Résistant gel</span>
+                    : null}
+                  {details.filledByAI
+                    ? <span className="detail-chip ai-chip">✦ Données complétées par IA</span>
+                    : null}
+                </div>
               ) : null}
+              {details?.wateringTips
+                ? <p className="watering-tips">💬 {details.wateringTips}</p>
+                : null}
             </div>
 
             <label className="field-label">Choisis un emoji</label>

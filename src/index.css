@@ -679,6 +679,50 @@ h3 {
   background: var(--surface2);
   border-radius: 12px;
   padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.result-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.latin-name {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.details-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.detail-chip {
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--surface3);
+  color: var(--text-dim);
+}
+
+.ai-chip {
+  border-color: rgba(74, 222, 128, 0.4);
+  color: var(--green);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.watering-tips {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .stagger-in {
