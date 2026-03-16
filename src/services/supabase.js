@@ -77,9 +77,12 @@ export async function insertPlant(plant) {
 export async function updatePlant(id, updates) {
   if (!supabase) throw new Error('Supabase non configuré')
   await authReady()
+  // Ne garder que les colonnes connues de la table pour éviter les erreurs Supabase
+  const safeUpdates = sanitizePlant({ ...updates, id })
+  delete safeUpdates.id
   const { data, error } = await supabase
     .from('plants')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...safeUpdates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select()
     .single()
