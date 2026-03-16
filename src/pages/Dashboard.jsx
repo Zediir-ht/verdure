@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { Spin } from 'antd'
 import RiskBanner from '../components/dashboard/RiskBanner'
 import PlantCard from '../components/PlantCard'
 import WeeklyImpact from '../components/weather/WeeklyImpact'
@@ -8,6 +9,8 @@ import { usePlantsStore } from '../store/usePlantsStore'
 export default function Dashboard() {
   const navigate = useNavigate()
   const plants = usePlantsStore((s) => s.plants)
+  const plantsLoading = usePlantsStore((s) => s.plantsLoading)
+  const plantsLoaded = usePlantsStore((s) => s.plantsLoaded)
   const weatherData = usePlantsStore((s) => s.weatherData)
   const waterPlant = usePlantsStore((s) => s.waterPlant)
   const waterAllPlants = usePlantsStore((s) => s.waterAllPlants)
@@ -39,7 +42,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {!plants.length ? (
+      {!plants.length && (plantsLoading || !plantsLoaded) ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <Spin size="large" tip="Chargement des plantes…" />
+        </div>
+      ) : !plants.length ? (
         <div className="empty-state">
           <p>Aucune plante pour le moment.</p>
           <button className="primary-btn" onClick={() => navigate('/add')}>
