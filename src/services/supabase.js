@@ -11,10 +11,24 @@ export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null
 
+// Promesse résolue dès qu'une session (anonyme ou non) est disponible
+let _authReady = null
+function authReady() {
+  if (!supabase) return Promise.resolve()
+  if (_authReady) return _authReady
+  _authReady = supabase.auth.getSession().then(async ({ data }) => {
+    if (!data.session) {
+      await supabase.auth.signInAnonymously().catch(() => {})
+    }
+  })
+  return _authReady
+}
+
 // ─── Plants CRUD ─────────────────────────────────────────────────────────────
 
 export async function fetchAllPlants() {
   if (!supabase) return []
+  await authReady()
   const { data, error } = await supabase
     .from('plants')
     .select('*')
@@ -23,11 +37,37 @@ export async function fetchAllPlants() {
   return data ?? []
 }
 
+// Colonnes valides de la table plants (cf. supabase-schema.sql)
+const PLANT_COLUMNS = [
+  'id', 'name', 'scientific_name', 'family', 'slug', 'perenual_id',
+  'photo_url', 'emoji',
+  'watering_frequency', 'watering_interval_days', 'sunlight', 'soil_type',
+  'fertilizer_type', 'fertilizer_season', 'pruning_month', 'pruning_description',
+  'origin', 'indoor', 'outdoor', 'cycle', 'growth_rate', 'maintenance',
+  'toxic_humans', 'toxic_dogs', 'toxic_cats',
+  'min_temperature', 'max_temperature',
+  'height_min_cm', 'height_max_cm', 'width_min_cm', 'width_max_cm',
+  'flowering_season', 'dormant_season', 'hardiness_zone',
+  'location', 'room', 'pot_size',
+  'last_watered', 'last_fertilized', 'last_repotted',
+  'notes', 'perenual_raw',
+]
+
+function sanitizePlant(plant) {
+  return Object.fromEntries(
+    PLANT_COLUMNS
+      .filter((k) => plant[k] !== undefined)
+      .map((k) => [k, plant[k]])
+  )
+}
+
 export async function insertPlant(plant) {
   if (!supabase) throw new Error('Supabase non configuré')
+  await authReady()
+  const row = sanitizePlant(plant)
   const { data, error } = await supabase
     .from('plants')
-    .insert([plant])
+    .insert([row])
     .select()
     .single()
   if (error) throw error
@@ -36,6 +76,7 @@ export async function insertPlant(plant) {
 
 export async function updatePlant(id, updates) {
   if (!supabase) throw new Error('Supabase non configuré')
+  await authReady()
   const { data, error } = await supabase
     .from('plants')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -48,6 +89,7 @@ export async function updatePlant(id, updates) {
 
 export async function deletePlantById(id) {
   if (!supabase) throw new Error('Supabase non configuré')
+  await authReady()
   const { error } = await supabase.from('plants').delete().eq('id', id)
   if (error) throw error
 }
@@ -68,6 +110,7 @@ export async function fetchWateringLogs(plantId) {
 
 export async function insertWateringLog(plantId, note = '', amount_ml = null) {
   if (!supabase) return null
+  await authReady()
   const { data, error } = await supabase
     .from('watering_logs')
     .insert([{ plant_id: plantId, watered_at: new Date().toISOString(), note, amount_ml }])
