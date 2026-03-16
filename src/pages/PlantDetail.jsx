@@ -165,17 +165,31 @@ export default function PlantDetail() {
   }
 
   const chartData = useMemo(() => {
+    const lastWateredDate = toLocalDate(plant.last_watered ?? plant.lastWatered)
     const days7 = [...new Array(7)].map((_, i) => {
       const d = new Date()
       d.setDate(d.getDate() - 6 + i)
       return toLocalDate(d.toISOString())
     })
     return days7.map((dateStr) => {
-      const log = wateringLogs.find((l) => toLocalDate(l.watered_at) === dateStr)
+      const hasLog = wateringLogs.some((l) => toLocalDate(l.watered_at) === dateStr)
+      // Utilise aussi plant.last_watered comme source de vérité
+      const isLastWatered = dateStr === lastWateredDate
       return {
         date: new Date(dateStr + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
-        watered: log ? 1 : 0,
+        watered: (hasLog || isLastWatered) ? 1 : 0,
       }
+    })
+  }, [wateringLogs, plant])
+
+  // Dédoublonne les logs par date locale pour l'affichage
+  const displayLogs = useMemo(() => {
+    const seen = new Set()
+    return wateringLogs.filter((l) => {
+      const d = toLocalDate(l.watered_at)
+      if (!d || seen.has(d)) return false
+      seen.add(d)
+      return true
     })
   }, [wateringLogs])
 
@@ -380,13 +394,13 @@ export default function PlantDetail() {
           )}
 
           {/* All logs */}
-          {wateringLogs.length > 0 && (
+          {displayLogs.length > 0 && (
             <>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Tous les arrosages ({wateringLogs.length})
+                Tous les arrosages ({displayLogs.length})
               </Text>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {wateringLogs.slice(0, 10).map((log) => (
+                {displayLogs.slice(0, 10).map((log) => (
                   <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: '#f0fdf4', borderRadius: 8 }}>
                     <Text>💧 {new Date(log.watered_at).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
                     {log.note && <Text type="secondary" style={{ fontSize: 12 }}>{log.note}</Text>}
