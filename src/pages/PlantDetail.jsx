@@ -130,6 +130,8 @@ export default function PlantDetail() {
   const activeRisks = usePlantsStore((s) => s.activeRisks)
   const dismissRisk = usePlantsStore((s) => s.dismissRisk)
   const enrichedProfiles = usePlantsStore((s) => s.enrichedProfiles)
+  const plantsLoading = usePlantsStore((s) => s.plantsLoading)
+  const plantsLoaded = usePlantsStore((s) => s.plantsLoaded)
 
   const [wateringLogs, setWateringLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
@@ -165,6 +167,7 @@ export default function PlantDetail() {
   }
 
   const chartData = useMemo(() => {
+    if (!plant) return []
     const lastWateredDate = toLocalDate(plant.last_watered ?? plant.lastWatered)
     const days7 = [...new Array(7)].map((_, i) => {
       const d = new Date()
@@ -194,6 +197,15 @@ export default function PlantDetail() {
   }, [wateringLogs])
 
   const contextAdvice = useMemo(() => buildContextualAdvice(plant, weather, profile), [plant, weather, profile])
+
+  // Chargement en cours → spinner (évite "Plante introuvable" au refresh)
+  if (!plant && (plantsLoading || !plantsLoaded)) {
+    return (
+      <section className="page" style={{ display: 'flex', justifyContent: 'center', paddingTop: 80 }}>
+        <Spin size="large" tip="Chargement…" />
+      </section>
+    )
+  }
 
   if (!plant) {
     return (
