@@ -72,7 +72,7 @@ export default function PlantCalendar() {
           onClick={() => navigate(-1)}
           style={{ minWidth: 44, minHeight: 44 }}
         />
-        <Title level={4} style={{ margin: 0, color: '#4a7c59' }}>
+        <Title level={4} style={{ margin: 0, color: '#2E5902' }}>
           📅 Planning d&apos;arrosage
         </Title>
       </div>
@@ -93,20 +93,20 @@ export default function PlantCalendar() {
                 style={{
                   borderRadius: 14,
                   border: items.length > 0 && i === 0
-                    ? '2px solid #4a7c59'
+                    ? '2px solid #2E5902'
                     : items.length > 0
-                    ? '1px solid #f59e0b'
-                    : '1px solid #e9f5ed',
-                  background: i === 0 && items.length > 0 ? '#f0fdf4' : '#fff',
+                    ? '1px solid #D96941'
+                    : '1px solid #dbe9d7',
+                  background: i === 0 && items.length > 0 ? '#f0f7eb' : '#fff',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: items.length ? 8 : 0 }}>
-                  <Text strong style={{ color: i === 0 ? '#4a7c59' : '#1a3c26', textTransform: 'capitalize' }}>
+                  <Text strong style={{ color: i === 0 ? '#2E5902' : '#193C40', textTransform: 'capitalize' }}>
                     {label}
                   </Text>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {items.length > 0 && (
-                      <Badge count={items.length} color="#4a7c59" />
+                      <Badge count={items.length} color="#2E5902" />
                     )}
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
@@ -160,7 +160,7 @@ export default function PlantCalendar() {
                             type="text"
                             icon={<DropboxOutlined />}
                             onClick={(e) => { e.stopPropagation(); waterPlant(plant.id) }}
-                            style={{ color: '#4a7c59', minHeight: 32, flexShrink: 0 }}
+                            style={{ color: '#2E5902', minHeight: 32, flexShrink: 0 }}
                           >
                             Arrosé
                           </Button>
