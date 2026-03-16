@@ -17,7 +17,7 @@ import {
 } from 'recharts'
 import PlantEnvironment from '../components/plants/PlantEnvironment'
 import { calculateHydricBalance } from '../services/hydricBalance'
-import { fetchWateringLogs, updateWateringLog, insertWateringLog } from '../services/supabase'
+import { fetchWateringLogs, deleteWateringLog, insertWateringLog } from '../services/supabase'
 import { uploadPlantPhoto } from '../services/plants'
 import { usePlantsStore } from '../store/usePlantsStore'
 
@@ -282,10 +282,11 @@ export default function PlantDetail() {
                         if (!date) { setEditingWaterDate(false); return }
                         const iso = date.toISOString()
                         updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
-                        // Écraser la date du log le plus récent (ou en créer un nouveau)
+                        // Supprimer le log le plus récent et en créer un nouveau avec la bonne date
                         if (wateringLogs.length > 0) {
                           const latest = wateringLogs[0]
-                          updateWateringLog(latest.id, iso).catch(() => {})
+                          deleteWateringLog(latest.id).catch(() => {})
+                          insertWateringLog(plant.id, latest.note ?? '', null, iso).catch(() => {})
                           setWateringLogs((prev) =>
                             prev.map((l) => (l.id === latest.id ? { ...l, watered_at: iso } : l))
                           )

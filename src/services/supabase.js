@@ -120,17 +120,14 @@ export async function insertWateringLog(plantId, note = '', amount_ml = null, wa
   return data
 }
 
-export async function updateWateringLog(logId, watered_at) {
-  if (!supabase) return null
+export async function deleteWateringLog(logId) {
+  if (!supabase) return
   await authReady()
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('watering_logs')
-    .update({ watered_at })
+    .delete()
     .eq('id', logId)
-    .select()
-    .single()
   if (error) throw error
-  return data
 }
 
 // ─── Photo upload ─────────────────────────────────────────────────────────────
