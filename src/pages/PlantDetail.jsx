@@ -3,11 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Alert, Avatar, Badge, Button, Card, Descriptions, Modal,
-  Progress, Space, Tabs, Tag, Tooltip, Typography, Upload, Spin, message
+  Progress, Space, Tabs, Tag, Tooltip, Typography, Upload, Spin, message, DatePicker
 } from 'antd'
+import dayjs from 'dayjs'
+import 'dayjs/locale/fr'
 import {
-  ArrowLeftOutlined, DeleteOutlined, CameraOutlined, DropboxOutlined
+  ArrowLeftOutlined, DeleteOutlined, CameraOutlined, DropboxOutlined, EditOutlined
 } from '@ant-design/icons'
+
+dayjs.locale('fr')
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip, ResponsiveContainer, BarChart, Bar
 } from 'recharts'
@@ -130,6 +134,7 @@ export default function PlantDetail() {
   const [wateringLogs, setWateringLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [editingWaterDate, setEditingWaterDate] = useState(false)
   const [msgApi, contextHolder] = message.useMessage()
 
   const profile = enrichedProfiles[id] ?? null
@@ -263,9 +268,38 @@ export default function PlantDetail() {
           {/* Last dates */}
           <Card size="small" style={{ marginBottom: 14 }}>
             <Space direction="vertical" style={{ width: '100%' }} size={6}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text type="secondary">Dernier arrosage</Text>
-                <Text strong>{formatDate(plant.last_watered ?? plant.lastWatered)}</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {editingWaterDate ? (
+                    <DatePicker
+                      size="small"
+                      defaultValue={plant.last_watered ? dayjs(plant.last_watered) : dayjs()}
+                      disabledDate={(d) => d && d.isAfter(dayjs())}
+                      format="DD/MM/YYYY"
+                      autoFocus
+                      onChange={async (date) => {
+                        if (!date) { setEditingWaterDate(false); return }
+                        const iso = date.toISOString()
+                        await updatePlant(plant.id, { last_watered: iso })
+                        setEditingWaterDate(false)
+                        msgApi.success('Date d\'arrosage mise à jour !')
+                      }}
+                      onBlur={() => setEditingWaterDate(false)}
+                    />
+                  ) : (
+                    <>
+                      <Text strong>{formatDate(plant.last_watered ?? plant.lastWatered)}</Text>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => setEditingWaterDate(true)}
+                        style={{ color: '#4a7c59', padding: '0 4px' }}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text type="secondary">Dernière fertilisation</Text>

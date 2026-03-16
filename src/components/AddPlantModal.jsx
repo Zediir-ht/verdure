@@ -2,13 +2,17 @@
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Badge, Button, Card, Input, Select, Spin, Tag, Typography, Space, Divider, Avatar
+  Badge, Button, Card, Input, Select, Spin, Tag, Typography, Space, Divider, Avatar, DatePicker
 } from 'antd'
+import dayjs from 'dayjs'
+import 'dayjs/locale/fr'
 import {
   SearchOutlined, CheckCircleOutlined, EnvironmentOutlined, ArrowLeftOutlined
 } from '@ant-design/icons'
 import { searchPlants, getPlantDetails } from '../services/plants'
 import { usePlantsStore } from '../store/usePlantsStore'
+
+dayjs.locale('fr')
 
 const { Text, Title } = Typography
 
@@ -53,6 +57,7 @@ export default function AddPlantModal() {
   const [location, setLocation] = useState('interieur')
   const [room, setRoom] = useState('salon')
   const [potSize, setPotSize] = useState('medium')
+  const [lastWatered, setLastWatered] = useState(dayjs())
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -92,7 +97,7 @@ export default function AddPlantModal() {
   const onConfirm = async () => {
     if (!selected || !details) return
     setSaving(true)
-    const now = new Date().toISOString()
+    const now = lastWatered ? lastWatered.toISOString() : new Date().toISOString()
     const coeff = details.wateringCoefficient ?? 0.5
     const type = coeff <= 0.25 ? 'cactus' : coeff >= 0.8 ? 'tropical' : 'flower'
 
@@ -338,6 +343,19 @@ export default function AddPlantModal() {
                   onChange={setPotSize}
                   options={potOptions}
                   style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <Text strong style={{ display: 'block', marginBottom: 8 }}>💧 Dernier arrosage</Text>
+                <DatePicker
+                  size="large"
+                  value={lastWatered}
+                  onChange={(d) => setLastWatered(d ?? dayjs())}
+                  disabledDate={(d) => d && d.isAfter(dayjs())}
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  placeholder="Aujourd'hui"
                 />
               </div>
 
