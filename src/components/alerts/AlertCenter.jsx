@@ -3,25 +3,39 @@ import { usePlantsStore } from '../../store/usePlantsStore'
 
 const RISK_ICONS = {
   frost: '🧊',
-  heat: '☀️',
+  heat: '🌡️',
   wind: '💨',
   rain: '🌧️',
   drought: '🏜️',
-  uv: '🔆',
+  uv: '☀️',
   humidity: '💧',
   seasonal: '🌿',
 }
 
 const LEVEL_LABELS = {
-  critical: 'CRITIQUE',
-  danger: 'DANGER',
-  warning: 'AVERTISSEMENT',
-  info: 'INFO',
+  critical: 'Critique',
+  danger: 'Danger',
+  warning: 'Avertissement',
+  info: 'Info',
 }
 
 const LEVEL_ORDER = { critical: 0, danger: 1, warning: 2, info: 3 }
 
+// Action contextuelle selon le type de risque
+function getAction(risk) {
+  switch (risk.riskType) {
+    case 'drought': return { label: '💧 Arroser maintenant', to: `/plant/${risk.plantId}` }
+    case 'frost': return { label: '🏠 Rentrer la plante', to: `/plant/${risk.plantId}` }
+    case 'heat': return { label: '🌿 Voir la fiche', to: `/plant/${risk.plantId}` }
+    case 'uv': return { label: '🌿 Voir la fiche', to: `/plant/${risk.plantId}` }
+    default: return null
+  }
+}
+
 function AlertCard({ risk, onDismiss }) {
+  const navigate = useNavigate()
+  const action = getAction(risk)
+
   return (
     <div className={`alert-card alert-card--${risk.level}`}>
       <div className="alert-card__border" />
@@ -40,12 +54,16 @@ function AlertCard({ risk, onDismiss }) {
         <p className="alert-card__message">{risk.message}</p>
 
         <div className="alert-card__footer">
-          <span className="alert-deadline-chip">
-            ⏱ {risk.deadline}
-          </span>
-          <span className="alert-trigger-chip">
-            {risk.triggerValue}
-          </span>
+          <span className="alert-deadline-chip">⏱ {risk.deadline}</span>
+          <span className="alert-trigger-chip">{risk.triggerValue}</span>
+          {action && (
+            <button
+              className={`alert-action-btn alert-action-btn--${risk.level}`}
+              onClick={() => navigate(action.to)}
+            >
+              {action.label}
+            </button>
+          )}
           <button
             className="alert-dismiss-btn"
             onClick={() => onDismiss(risk.id)}
@@ -76,25 +94,35 @@ export default function AlertCenter() {
     info: sorted.filter((r) => r.level === 'info'),
   }
 
+  const GROUP_ICONS = { critical: '🔴', danger: '🟠', warning: '🟡', info: '🔵' }
+
   return (
     <section className="page alert-center">
       <div className="alert-center__header">
-        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Retour">
-          ‹
-        </button>
-        <h2>Centre d'alertes</h2>
-        {globalSummary && (
-          <div className="weather-summary-chip">
-            🌤 {globalSummary.weatherSummary}
-          </div>
-        )}
+        <button className="back-btn" onClick={() => navigate(-1)} aria-label="Retour">‹</button>
+        <div>
+          <h2 style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic', fontSize: '1.4rem', letterSpacing: '-0.02em' }}>
+            Centre d'alertes
+          </h2>
+          {activeRisks.length > 0 && (
+            <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem', marginTop: 2 }}>
+              {activeRisks.length} alerte{activeRisks.length > 1 ? 's' : ''} active{activeRisks.length > 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
       </div>
+
+      {globalSummary?.weatherSummary && (
+        <div className="weather-summary-chip">
+          🌤 {globalSummary.weatherSummary}
+        </div>
+      )}
 
       {!activeRisks.length ? (
         <div className="alert-empty">
           <div className="alert-empty__icon">🌿</div>
-          <h3>Toutes vos plantes sont en sécurité</h3>
-          <p>Aucune alerte active pour le moment. Beau travail !</p>
+          <h3>Tout va bien !</h3>
+          <p>Aucune alerte active. Vos plantes sont en sécurité.</p>
         </div>
       ) : (
         <div className="alert-list">
@@ -110,7 +138,7 @@ export default function AlertCenter() {
             return (
               <div key={level} className="alert-group">
                 <h3 className={`alert-group__title alert-group__title--${level}`}>
-                  {RISK_ICONS[level] ?? '⚠️'} {LEVEL_LABELS[level]}
+                  {GROUP_ICONS[level]} {LEVEL_LABELS[level]}
                   <span className="alert-group__count">{risks.length}</span>
                 </h3>
                 {risks.map((risk) => (
