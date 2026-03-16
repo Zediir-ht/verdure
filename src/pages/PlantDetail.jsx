@@ -282,40 +282,39 @@ export default function PlantDetail() {
                 <Text type="secondary">Dernier arrosage</Text>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {editingWaterDate ? (
-                    <DatePicker
-                      size="small"
-                      defaultValue={plant.last_watered ? dayjs(plant.last_watered) : dayjs()}
-                      disabledDate={(d) => d && d.isAfter(dayjs())}
-                      format="DD/MM/YYYY"
-                      autoFocus
-                      onChange={(date) => {
-                        if (!date) { setEditingWaterDate(false); return }
-                        const iso = date.toISOString()
-                        updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
-                        // Supprimer le log le plus récent et en créer un nouveau avec la bonne date
-                        const doUpdate = async () => {
-                          if (wateringLogs.length > 0) {
-                            const latest = wateringLogs[0]
-                            await deleteWateringLog(latest.id).catch(() => {})
-                            await insertWateringLog(plant.id, latest.note ?? '', null, iso).catch(() => {})
-                          } else {
-                            await insertWateringLog(plant.id, 'Correction manuelle', null, iso).catch(() => {})
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <DatePicker
+                        size="small"
+                        defaultValue={plant.last_watered ? dayjs(plant.last_watered) : dayjs()}
+                        disabledDate={(d) => d && d.isAfter(dayjs())}
+                        format="DD/MM/YYYY"
+                        autoFocus
+                        onChange={(date) => {
+                          if (!date) return
+                          const iso = date.toISOString()
+                          updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
+                          const doUpdate = async () => {
+                            if (wateringLogs.length > 0) {
+                              const latest = wateringLogs[0]
+                              await deleteWateringLog(latest.id).catch(() => {})
+                              await insertWateringLog(plant.id, latest.note ?? '', null, iso).catch(() => {})
+                            } else {
+                              await insertWateringLog(plant.id, 'Correction manuelle', null, iso).catch(() => {})
+                            }
+                            reloadLogs()
                           }
-                          // Recharge depuis la DB pour refléter l'état réel
-                          reloadLogs()
-                        }
-                        // Mise à jour optimiste immédiate de l'affichage
-                        setWateringLogs((prev) =>
-                          prev.length > 0
-                            ? prev.map((l, i) => (i === 0 ? { ...l, watered_at: iso } : l))
-                            : [{ id: `tmp-${Date.now()}`, plant_id: plant.id, watered_at: iso, note: '' }]
-                        )
-                        doUpdate()
-                        setEditingWaterDate(false)
-                        msgApi.success('Date d\'arrosage mise à jour !')
-                      }}
-                      onBlur={() => setEditingWaterDate(false)}
-                    />
+                          setWateringLogs((prev) =>
+                            prev.length > 0
+                              ? prev.map((l, i) => (i === 0 ? { ...l, watered_at: iso } : l))
+                              : [{ id: `tmp-${Date.now()}`, plant_id: plant.id, watered_at: iso, note: '' }]
+                          )
+                          doUpdate()
+                          setEditingWaterDate(false)
+                          msgApi.success('Date d\'arrosage mise à jour !')
+                        }}
+                      />
+                      <Button size="small" type="text" onClick={() => setEditingWaterDate(false)} style={{ color: '#888' }}>✕</Button>
+                    </div>
                   ) : (
                     <>
                       <Text strong>{formatDate(plant.last_watered ?? plant.lastWatered)}</Text>
