@@ -75,7 +75,15 @@ export const usePlantsStore = create(
       loadPlants: async () => {
         set({ plantsLoading: true })
         try {
-          const plants = await fetchAllPlants()
+          const raw = await fetchAllPlants()
+          // Normalise snake_case → camelCase pour hydricBalance
+          const plants = raw.map((p) => ({
+            ...p,
+            lastWatered: p.last_watered ?? p.lastWatered ?? null,
+            wateringIntervalDays: p.watering_interval_days ?? p.wateringIntervalDays ?? 7,
+            wateringCoefficient: p.wateringCoefficient ?? null,
+            potSize: p.pot_size ?? p.potSize ?? 'medium',
+          }))
           set({ plants, plantsLoaded: true, plantsLoading: false })
           get().refreshRisks()
         } catch {

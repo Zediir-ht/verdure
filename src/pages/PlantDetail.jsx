@@ -281,7 +281,7 @@ export default function PlantDetail() {
                       onChange={(date) => {
                         if (!date) { setEditingWaterDate(false); return }
                         const iso = date.toISOString()
-                        updatePlant(plant.id, { last_watered: iso }) // optimiste, pas d'await
+                        updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
                         setEditingWaterDate(false)
                         msgApi.success('Date d\'arrosage mise à jour !')
                       }}
