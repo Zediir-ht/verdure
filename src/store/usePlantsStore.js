@@ -3,6 +3,13 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { enrichPlant } from '../services/plantEnrichment'
 import { analyseRisks } from '../services/weatherRiskEngine'
 import { fetchWeather, DEFAULT_COORDS } from '../services/weather'
+import {
+  fetchAllPlants,
+  insertPlant,
+  updatePlant as dbUpdatePlant,
+  deletePlantById,
+  insertWateringLog,
+} from '../services/supabase'
 
 // ---------------------------------------------------------------------------
 // Hybrid storage: localStorage (fast, offline) + Supabase via /api/store (sync)
@@ -54,6 +61,8 @@ export const usePlantsStore = create(
   persist(
     (set, get) => ({
       plants: [],
+      plantsLoaded: false,         // true once Supabase fetch completed (or failed)
+      plantsLoading: false,
       weatherData: null,
       enrichedProfiles: {},
       activeRisks: [],
@@ -62,44 +71,104 @@ export const usePlantsStore = create(
       lastWeatherFetch: null,
       dismissedRiskIds: [],
 
-      addPlant: (plant) =>
-        set((state) => ({
-          plants: [plant, ...state.plants],
-        })),
+      // ── Load plants from Supabase ─────────────────────────────────────────
+      loadPlants: async () => {
+        set({ plantsLoading: true })
+        try {
+          const plants = await fetchAllPlants()
+          set({ plants, plantsLoaded: true, plantsLoading: false })
+          get().refreshRisks()
+        } catch {
+          set({ plantsLoaded: true, plantsLoading: false })
+        }
+      },
 
-      deletePlant: (id) =>
+      addPlant: async (plant) => {
+        // Optimistic local update
+        set((state) => ({ plants: [plant, ...state.plants] }))
+        try {
+          const saved = await insertPlant(plant)
+          // Replace temp entry with DB row (may have different UUID)
+          if (saved && saved.id !== plant.id) {
+            set((state) => ({
+              plants: state.plants.map((p) => (p.id === plant.id ? saved : p)),
+            }))
+          }
+        } catch {
+          // revert on failure
+          set((state) => ({ plants: state.plants.filter((p) => p.id !== plant.id) }))
+        }
+      },
+
+      updatePlant: async (id, updates) => {
+        set((state) => ({
+          plants: state.plants.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        }))
+        try {
+          await dbUpdatePlant(id, updates)
+        } catch {
+          // keep local update, will sync on next load
+        }
+      },
+
+      deletePlant: async (id) => {
         set((state) => ({
           plants: state.plants.filter((p) => p.id !== id),
           enrichedProfiles: Object.fromEntries(
             Object.entries(state.enrichedProfiles).filter(([k]) => k !== id),
           ),
           activeRisks: state.activeRisks.filter((r) => r.plantId !== id),
-        })),
+        }))
+        try {
+          await deletePlantById(id)
+        } catch {
+          // non-fatal: will be deleted on next sync
+        }
+      },
 
-      waterAllPlants: () =>
-        set((state) => {
-          const nowIso = new Date().toISOString()
-          return {
-            plants: state.plants.map((p) => ({
-              ...p,
-              lastWatered: nowIso,
-              history: [{ date: nowIso, action: 'Arrosage manuel' }, ...(p.history || [])],
-            })),
-          }
-        }),
+      waterAllPlants: async () => {
+        const { plants } = get()
+        const nowIso = new Date().toISOString()
+        set({
+          plants: plants.map((p) => ({
+            ...p,
+            last_watered: nowIso,
+            lastWatered: nowIso,
+            history: [{ date: nowIso, action: 'Arrosage manuel' }, ...(p.history || [])],
+          })),
+        })
+        await Promise.allSettled(
+          plants.map((p) =>
+            Promise.all([
+              dbUpdatePlant(p.id, { last_watered: nowIso }),
+              insertWateringLog(p.id, 'Arrosage groupé'),
+            ]),
+          ),
+        )
+      },
 
-      waterPlant: (id) =>
+      waterPlant: async (id) => {
+        const nowIso = new Date().toISOString()
         set((state) => ({
           plants: state.plants.map((p) => {
             if (p.id !== id) return p
-            const nowIso = new Date().toISOString()
             return {
               ...p,
+              last_watered: nowIso,
               lastWatered: nowIso,
               history: [{ date: nowIso, action: 'Arrosage manuel' }, ...(p.history || [])],
             }
           }),
-        })),
+        }))
+        try {
+          await Promise.all([
+            dbUpdatePlant(id, { last_watered: nowIso }),
+            insertWateringLog(id, 'Arrosage manuel'),
+          ])
+        } catch {
+          // non-fatal
+        }
+      },
 
       updateWeather: (weatherData) =>
         set({
@@ -169,6 +238,7 @@ export const usePlantsStore = create(
         lastWeatherFetch: state.lastWeatherFetch,
         enrichedProfiles: state.enrichedProfiles,
         dismissedRiskIds: state.dismissedRiskIds,
+        plantsLoaded: false, // always reload on next boot
       }),
     },
   ),

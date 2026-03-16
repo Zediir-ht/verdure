@@ -2,8 +2,8 @@ import { NavLink } from 'react-router-dom'
 import { usePlantsStore } from '../store/usePlantsStore'
 
 const navItems = [
-  { to: '/', icon: '🏠', label: 'Dashboard', exact: true },
-  { to: '/weather', icon: '🌤', label: 'Météo' },
+  { to: '/', icon: '🏠', label: 'Accueil', exact: true },
+  { to: '/calendar', icon: '📅', label: 'Calendrier' },
   { to: '/alerts', icon: '🔔', label: 'Alertes' },
   { to: '/advisor', icon: '✦', label: 'IA' },
   { to: '/settings', icon: '⚙️', label: 'Réglages' },

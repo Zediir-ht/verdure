@@ -1,186 +1,92 @@
-const TREFLE_BASE = '/api/trefle'
-const CLAUDE_URL = '/anthropic/v1/messages'
-// Token injected server-side by Vercel function
+﻿// Plants service — wraps Perenual API + Supabase DB
+// Replaces Trefle.io entirely
 
-const moistureMap = {
-  Low: 0.2,
-  Medium: 0.5,
-  High: 0.9,
+import { searchPerenual, getPerenualDetails } from './perenual'
+import {
+  fetchAllPlants as dbFetchAll,
+  insertPlant as dbInsert,
+  updatePlant as dbUpdate,
+  deletePlantById as dbDelete,
+  insertWateringLog as dbLogWatering,
+  uploadPlantPhoto as dbUploadPhoto,
+} from './supabase'
+
+// ─── Coefficient helpers (kept for hydricBalance compat) ─────────────────────
+
+const WATERING_COEFF = { frequent: 0.9, average: 0.5, minimum: 0.2, none: 0.05 }
+const WATERING_INTERVAL = { frequent: 3, average: 7, minimum: 14, none: 30 }
+
+export function mapWateringToCoefficient(watering) {
+  return WATERING_COEFF[watering?.toLowerCase()] ?? 0.5
 }
 
 export function mapMoistureToCoefficient(moisture) {
-  return moistureMap[moisture] ?? null
+  return mapWateringToCoefficient(moisture)
 }
 
-// Keep backward-compat alias used by AddPlantModal / PlantDetail
-export function mapWateringToCoefficient(moisture) {
-  return mapMoistureToCoefficient(moisture) ?? 0.5
+export function mapMoistureToIntervalDays(watering) {
+  return WATERING_INTERVAL[watering?.toLowerCase()] ?? 7
 }
 
-function cacheGet(key) {
-  try {
-    const raw = sessionStorage.getItem(key)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    sessionStorage.removeItem(key)
-    return null
-  }
-}
-
-function cacheSet(key, value) {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(value))
-  } catch {
-    // sessionStorage full — ignore
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Claude fallback — fetch watering data when Trefle has none
-// ---------------------------------------------------------------------------
-
-// Map Trefle moisture_use → interval in days
-const moistureIntervalMap = {
-  Low: 14,
-  Medium: 7,
-  High: 4,
-}
-
-export function mapMoistureToIntervalDays(moistureUse) {
-  return moistureIntervalMap[moistureUse] ?? null
-}
-
-async function fetchWateringFromClaude(latinName) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!apiKey) return null
-
-  const cacheKey = `verdure:claude:plant:${latinName.toLowerCase()}`
-  const cached = cacheGet(cacheKey)
-  if (cached) return cached
-
-  try {
-    const res = await fetch(CLAUDE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 256,
-        messages: [
-          {
-            role: 'user',
-            content:
-              `Give me the watering data for ${latinName} in JSON format only, no extra text: ` +
-              `{ "wateringCoefficient": number (0.0-1.0), "wateringIntervalDays": number (days between waterings for an indoor pot), ` +
-              `"droughtTolerant": boolean, "frostHardy": boolean, "wateringTips": string }`,
-          },
-        ],
-      }),
-    })
-
-    if (!res.ok) return null
-    const payload = await res.json()
-    const text = payload?.content?.[0]?.text ?? ''
-    // Extract JSON block even if Claude adds surrounding text
-    const match = text.match(/\{[\s\S]*\}/)
-    if (!match) return null
-    const parsed = JSON.parse(match[0])
-    cacheSet(cacheKey, parsed)
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Search
-// ---------------------------------------------------------------------------
+// ─── Search (delegates to Perenual service) ──────────────────────────────────
 
 export async function searchPlants(query) {
-  if (!query?.trim()) return []
-
-  const cacheKey = `verdure:trefle:search:${query.trim().toLowerCase()}`
-  const cached = cacheGet(cacheKey)
-  if (cached) return cached
-
-  const res = await fetch(`${TREFLE_BASE}?q=${encodeURIComponent(query.trim())}`)
-  if (!res.ok) throw new Error('Recherche de plante indisponible.')
-
-  const payload = await res.json()
-  const items = (payload?.data ?? []).map((p) => ({
+  const results = await searchPerenual(query)
+  return results.map((p) => ({
     id: p.id,
-    // Prefer common name, fall back to scientific
-    name: p.common_name || p.scientific_name || 'Plante inconnue',
-    latinName: p.scientific_name || '',
-    thumbnail: p.image_url || '',
+    name: p.name,
+    latinName: p.scientificName,
+    thumbnail: p.imageUrl ?? '',
+    cycle: p.cycle,
+    watering: p.watering,
   }))
-
-  cacheSet(cacheKey, items)
-  return items
 }
 
-// ---------------------------------------------------------------------------
-// Details
-// ---------------------------------------------------------------------------
+// ─── Details (delegates to Perenual service) ────────────────────────────────
 
-export async function getPlantDetails(id) {
-  const cacheKey = `verdure:trefle:details:${id}`
-  const cached = cacheGet(cacheKey)
-  if (cached) return cached
-
-  const res = await fetch(`${TREFLE_BASE}?id=${id}`)
-  if (!res.ok) throw new Error('Impossible de charger les détails de la plante.')
-
-  const payload = await res.json()
-  const data = payload?.data ?? {}
-  const growth = data.main_species?.growth ?? data.growth ?? {}
-  const specs = data.main_species?.specifications ?? data.specifications ?? {}
-
-  const moistureUse = growth.moisture_use ?? null
-  const lightLevel = growth.light ?? null
-  const avgHeightCm = specs.average_height?.cm ?? null
-  const droughtTolerance = growth.drought_tolerance ?? null
-  const frostFreeDays = growth.frost_free_days ?? null
-  const latinName = data.scientific_name || ''
-
-  let wateringCoefficient = mapMoistureToCoefficient(moistureUse)
-  let wateringIntervalDays = mapMoistureToIntervalDays(moistureUse)
-  let claudeData = null
-
-  // Fallback to Claude when Trefle has no moisture data
-  if ((wateringCoefficient === null || wateringIntervalDays === null) && latinName) {
-    claudeData = await fetchWateringFromClaude(latinName)
-    wateringCoefficient = claudeData?.wateringCoefficient ?? wateringCoefficient ?? 0.5
-    wateringIntervalDays = claudeData?.wateringIntervalDays ?? wateringIntervalDays ?? 7
+export async function getPlantDetails(perenualId) {
+  const p = await getPerenualDetails(perenualId)
+  return {
+    ...p,
+    watering: p.watering_frequency,
+    wateringCoefficient: mapWateringToCoefficient(p.perenual_raw?.watering),
+    wateringIntervalDays: p.watering_interval_days,
+    wateringTips: null,
+    droughtTolerant: p.perenual_raw?.drought_tolerant ?? false,
+    frostHardy: p.min_temperature !== null ? p.min_temperature <= 0 : false,
+    light: null,
+    avgHeightCm: p.height_max_cm,
+    latinName: p.scientific_name,
+    commonName: p.name,
+    description: p.perenual_raw?.description ?? '',
+    imageUrl: p.photo_url ?? '',
+    sunlight: p.sunlight ? [p.sunlight] : [],
+    filledByAI: false,
   }
+}
 
-  const result = {
-    // Watering
-    watering: moistureUse ?? (claudeData ? 'via IA' : 'Non renseigné'),
-    wateringCoefficient,
-    wateringIntervalDays,
-    wateringTips: claudeData?.wateringTips ?? null,
-    // Care
-    droughtTolerant: claudeData?.droughtTolerant ?? (droughtTolerance === 'High' || droughtTolerance === 'Very High'),
-    frostHardy: claudeData?.frostHardy ?? (frostFreeDays !== null ? frostFreeDays < 30 : null),
-    // Growth
-    light: lightLevel,          // 0-10 scale from Trefle
-    avgHeightCm,
-    droughtTolerance,
-    frostFreeDays,
-    // Meta
-    latinName,
-    commonName: data.common_name || '',
-    description: data.main_species?.observations ?? data.observations ?? 'Pas de description disponible.',
-    imageUrl: data.image_url || '',
-    // Keep sunlight as array for backward compat with PlantDetail
-    sunlight: lightLevel !== null ? [`Lumière : ${lightLevel}/10`] : [],
-    filledByAI: !!claudeData,
-  }
+// ─── Supabase CRUD ───────────────────────────────────────────────────────────
 
-  cacheSet(cacheKey, result)
-  return result
+export async function loadPlantsFromDB() {
+  return dbFetchAll()
+}
+
+export async function savePlantToDB(plant) {
+  return dbInsert(plant)
+}
+
+export async function updatePlantInDB(id, updates) {
+  return dbUpdate(id, updates)
+}
+
+export async function deletePlantFromDB(id) {
+  return dbDelete(id)
+}
+
+export async function logWatering(plantId, note) {
+  return dbLogWatering(plantId, note ?? '')
+}
+
+export async function uploadPlantPhoto(plantId, file) {
+  return dbUploadPhoto(plantId, file)
 }

@@ -4,9 +4,9 @@ export default function Header({ weather, cityName = 'Rodez' }) {
   return (
     <header className="header-glass">
       <div>
-        <p className="eyebrow">Verdure</p>
-        <h1 className="title-hero">Prends soin de tes plantes</h1>
-        <p className="subtitle">{cityName}, France</p>
+        <p className="eyebrow">🌿 Coco et Cam font pousser</p>
+        <h1 className="title-hero">On a la main verte…</h1>
+        <p className="subtitle">…en théorie 😄 · {cityName}, France</p>
       </div>
       <div className="weather-pill" role="status" aria-live="polite">
         <WeatherIcon weatherCode={weather?.weatherCode} large />

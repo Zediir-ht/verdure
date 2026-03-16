@@ -1,20 +1,27 @@
 {
-  "name": "Verdure",
-  "short_name": "Verdure",
-  "theme_color": "#0a1628",
-  "background_color": "#0a1628",
+  "name": "Coco et Cam font pousser",
+  "short_name": "Cocobet Cam",
+  "description": "On a la main verte… en théorie",
+  "theme_color": "#4a7c59",
+  "background_color": "#f5fbf6",
   "display": "standalone",
   "start_url": "/",
+  "orientation": "portrait",
+  "lang": "fr",
   "icons": [
     {
       "src": "/icons/icon-192.svg",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512.svg",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "categories": ["lifestyle", "utilities"]
 }

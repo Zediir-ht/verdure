@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { ConfigProvider, App as AntApp } from 'antd'
+import frFR from 'antd/locale/fr_FR'
 import AddPlantModal from './components/AddPlantModal'
 import BottomNav from './components/BottomNav'
 import Header from './components/Header'
@@ -9,17 +11,39 @@ import Dashboard from './pages/Dashboard'
 import PlantDetail from './pages/PlantDetail'
 import Settings from './pages/Settings'
 import WeatherDetail from './pages/WeatherDetail'
+import PlantCalendar from './pages/PlantCalendar'
 import { DEFAULT_COORDS, fetchWeather } from './services/weather'
 import { requestNotificationPermission, scheduleDailyNotifications, notifyCriticalRisks } from './services/notifications'
 import { usePlantsStore } from './store/usePlantsStore'
+
+const antTheme = {
+  token: {
+    colorPrimary: '#4a7c59',
+    colorSuccess: '#4a7c59',
+    colorLink: '#4a7c59',
+    borderRadius: 12,
+    fontFamily: "'Geist', system-ui, sans-serif",
+  },
+  components: {
+    Button: { borderRadius: 12 },
+    Card: { borderRadius: 16 },
+    Modal: { borderRadius: 16 },
+  },
+}
 
 function useWeatherBootstrap() {
   const updateWeather = usePlantsStore((s) => s.updateWeather)
   const refreshRisks = usePlantsStore((s) => s.refreshRisks)
   const enrichAllPlants = usePlantsStore((s) => s.enrichAllPlants)
   const lastWeatherFetch = usePlantsStore((s) => s.lastWeatherFetch)
+  const loadPlants = usePlantsStore((s) => s.loadPlants)
   const [cityName, setCityName] = useState(DEFAULT_COORDS.city)
   const [status, setStatus] = useState({ loading: true, error: '' })
+
+  useEffect(() => {
+    // Load plants from Supabase on mount
+    loadPlants()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let active = true
@@ -109,28 +133,33 @@ export default function App() {
   const showHeader = useMemo(() => !location.pathname.startsWith('/add'), [location.pathname])
 
   return (
-    <div className="app-shell">
-      {showHeader ? <Header weather={weather?.current} cityName={cityName} /> : null}
+    <ConfigProvider theme={antTheme} locale={frFR}>
+      <AntApp>
+        <div className="app-shell">
+          {showHeader ? <Header weather={weather?.current} cityName={cityName} /> : null}
 
-      {status.loading && !weather ? <div className="status-banner">Chargement météo…</div> : null}
-      {status.error ? <div className="status-banner error">{status.error}</div> : null}
+          {status.loading && !weather ? <div className="status-banner">Chargement météo…</div> : null}
+          {status.error ? <div className="status-banner error">{status.error}</div> : null}
 
-      <main className="content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/plants" element={<Dashboard />} />
-          <Route path="/plant/:id" element={<PlantDetail />} />
-          <Route path="/add" element={<AddPlantModal />} />
-          <Route path="/weather" element={<WeatherDetail />} />
-          <Route path="/advisor" element={<AIAdvisor />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/alerts" element={<AlertCenter />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
+          <main className="content">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/plants" element={<Dashboard />} />
+              <Route path="/plant/:id" element={<PlantDetail />} />
+              <Route path="/add" element={<AddPlantModal />} />
+              <Route path="/weather" element={<WeatherDetail />} />
+              <Route path="/advisor" element={<AIAdvisor />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/alerts" element={<AlertCenter />} />
+              <Route path="/calendar" element={<PlantCalendar />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
 
-      <BottomNav />
-    </div>
+          <BottomNav />
+        </div>
+      </AntApp>
+    </ConfigProvider>
   )
 }
 

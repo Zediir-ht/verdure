@@ -1,7 +1,6 @@
-// Plant enrichment service: combines Trefle + Claude to build complete plant profiles
-const TREFLE_BASE = '/api/trefle'
+// Plant enrichment service: combines Perenual + Claude to build complete plant profiles
+// Trefle.io removed — now uses Perenual API via /api/perenual
 const CLAUDE_URL = '/anthropic/v1/messages'
-// Token injected server-side by Vercel function
 const CACHE_PREFIX = 'enriched_'
 
 // ─── Persistent localStorage cache ──────────────────────────────────────────
@@ -40,39 +39,28 @@ function sessionSet(key, value) {
 
 // ─── Trefle JWT ──────────────────────────────────────────────────────────────
 
-// ─── Trefle fetch ─────────────────────────────────────────────────────────────
+// ─── Trefle fetch REMOVED — using Perenual data from plant record ────────────
 
-async function fetchTrefleData(latinName) {
-  if (!latinName) return null
-  try {
-    const res = await fetch(`${TREFLE_BASE}?q=${encodeURIComponent(latinName.trim())}`)
-    if (!res.ok) return null
-    const payload = await res.json()
-    const plant = payload?.data?.[0]
-    if (!plant) return null
-
-    // Fetch full detail for growth data
-    const detailRes = await fetch(`${TREFLE_BASE}?id=${plant.id}`)
-    if (!detailRes.ok) return null
-    const detail = await detailRes.json()
-    const d = detail?.data ?? {}
-    const growth = d.main_species?.growth ?? d.growth ?? {}
-    const specs = d.main_species?.specifications ?? d.specifications ?? {}
-    const minTemp = d.main_species?.growth?.minimum_temperature?.deg_c ?? null
-    const maxTemp = specs?.maximum_temperature?.deg_c ?? null
-
-    return {
-      moisture_use: growth.moisture_use ?? null,
-      drought_tolerance: growth.drought_tolerance ?? null,
-      frost_free_days: growth.frost_free_days ?? null,
-      light: growth.light ?? null,
-      ph_minimum: growth.ph_minimum ?? null,
-      ph_maximum: growth.ph_maximum ?? null,
-      minimum_temperature: minTemp,
-      maximum_temperature: maxTemp,
-    }
-  } catch {
-    return null
+/**
+ * Build Perenual-equivalent enrichment data from actual plant record
+ * (plants already store Perenual data after creation via AddPlantModal)
+ */
+function buildPerenualData(plant) {
+  if (!plant) return null
+  return {
+    moisture_use: plant.watering_frequency ? (
+      plant.watering_interval_days <= 4 ? 'High' :
+      plant.watering_interval_days <= 10 ? 'Medium' : 'Low'
+    ) : null,
+    drought_tolerance: plant.perenual_raw?.drought_tolerant ? 'High' : 'Medium',
+    frost_free_days: plant.min_temperature !== null && plant.min_temperature !== undefined
+      ? (plant.min_temperature <= 0 ? 10 : 90)
+      : null,
+    light: null, // Perenual doesn't use 0-10 scale
+    ph_minimum: null,
+    ph_maximum: null,
+    minimum_temperature: plant.min_temperature ?? null,
+    maximum_temperature: plant.max_temperature ?? null,
   }
 }
 
@@ -196,22 +184,21 @@ function buildEnriched(plant, trefle, claude) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function enrichPlant(plant) {
-  const latinName = plant?.latinName
+  const latinName = plant?.latinName ?? plant?.scientific_name
   if (!latinName) return buildEnriched(plant, null, null)
 
   const cacheKey = `${CACHE_PREFIX}${latinName.toLowerCase().replace(/\s+/g, '_')}`
   const cached = persistGet(cacheKey)
   if (cached) return cached
 
-  const [trefle, claude] = await Promise.allSettled([
-    fetchTrefleData(latinName),
+  const perenualData = buildPerenualData(plant)
+  const [claude] = await Promise.allSettled([
     fetchClaudeProfile(latinName, plant.name),
   ])
 
-  const trefleData = trefle.status === 'fulfilled' ? trefle.value : null
   const claudeData = claude.status === 'fulfilled' ? claude.value : null
 
-  const profile = buildEnriched(plant, trefleData, claudeData)
+  const profile = buildEnriched(plant, perenualData, claudeData)
   persistSet(cacheKey, profile)
   return profile
 }
