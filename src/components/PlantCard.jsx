@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { formatRelativeDate } from '../utils/date'
 
@@ -35,7 +35,9 @@ function WaterBar({ urgencyScore }) {
 
 export default function PlantCard({ plant, urgencyScore, nextWateringDate, reasoning, onWater }) {
   const navigate = useNavigate()
-  const [touchStart, setTouchStart] = useState(null)
+  const touchRef = useRef(null)   // { x, y } at touchstart
+  const scrolledRef = useRef(false) // true if vertical movement > threshold
+  const mouseRef = useRef(null)   // { x, y } at mousedown
   const [offset, setOffset] = useState(0)
   const [watering, setWatering] = useState(false)
   const [drops, setDrops] = useState([])
@@ -45,23 +47,55 @@ export default function PlantCard({ plant, urgencyScore, nextWateringDate, reaso
   const isUrgent = urgencyScore > 70
   const isMedium = urgencyScore > 40
 
+  // ── Touch handlers (mobile) ──────────────────────────────────────────────
   const handleTouchStart = (e) => {
     const t = e.changedTouches[0]
-    setTouchStart({ x: t.clientX, y: t.clientY })
+    touchRef.current = { x: t.clientX, y: t.clientY }
+    scrolledRef.current = false
+    setOffset(0)
   }
+
   const handleTouchMove = (e) => {
-    if (!touchStart) return
-    const dx = e.changedTouches[0].clientX - touchStart.x
-    const dy = e.changedTouches[0].clientY - touchStart.y
-    // Vertical gesture — let the browser scroll, don't interfere
-    if (Math.abs(dy) > Math.abs(dx)) return
+    if (!touchRef.current) return
+    const dx = e.changedTouches[0].clientX - touchRef.current.x
+    const dy = e.changedTouches[0].clientY - touchRef.current.y
+    // If vertical movement > 8px → user is scrolling, bail out entirely
+    if (Math.abs(dy) > 8) {
+      scrolledRef.current = true
+      setOffset(0)
+      return
+    }
     if (dx < 0) setOffset(Math.max(dx, -110))
   }
+
   const handleTouchEnd = () => {
-    if (offset < -80) triggerWater()
-    else if (touchStart && Math.abs(offset) < 12) navigate(`/plant/${plant.id}`)
+    const ts = touchRef.current
+    const scrolled = scrolledRef.current
+    touchRef.current = null
+    scrolledRef.current = false
+
+    if (scrolled) { setOffset(0); return }
+
+    if (offset < -80) {
+      triggerWater()
+    } else if (ts && Math.abs(offset) < 12) {
+      navigate(`/plant/${plant.id}`)
+    }
     setOffset(0)
-    setTouchStart(null)
+  }
+
+  // ── Mouse handlers (desktop) ─────────────────────────────────────────────
+  const handleMouseDown = (e) => {
+    mouseRef.current = { x: e.clientX, y: e.clientY }
+  }
+
+  const handleMouseUp = (e) => {
+    if (!mouseRef.current) return
+    const dx = Math.abs(e.clientX - mouseRef.current.x)
+    const dy = Math.abs(e.clientY - mouseRef.current.y)
+    mouseRef.current = null
+    // Only navigate if mouse barely moved (real click, not drag-select)
+    if (dx < 5 && dy < 5) navigate(`/plant/${plant.id}`)
   }
 
   const triggerWater = () => {
@@ -83,7 +117,8 @@ export default function PlantCard({ plant, urgencyScore, nextWateringDate, reaso
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={() => navigate(`/plant/${plant.id}`)}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
     >
       {drops.map((d) => (
         <span

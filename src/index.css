@@ -457,7 +457,63 @@ h1, h2, h3 { margin: 0; color: var(--green-dark); }
 @keyframes waterPulse { 0% { box-shadow: 0 0 0 0 rgba(56,189,248,0.5); } 100% { box-shadow: 0 0 0 14px rgba(56,189,248,0); } }
 @keyframes dropBurst { 0% { opacity: 1; transform: translateY(-50%) scale(0.5); } 60% { opacity: 1; transform: translateY(-180%) scale(1.2); } 100% { opacity: 0; transform: translateY(-260%) scale(0.8); } }
 
-.plant-card:nth-child(1) { animation-delay: 0.05s; }
+/* ═══════════════════════════════════════════
+   RESPONSIVE — mobile-first refinements
+═══════════════════════════════════════════ */
+
+/* Ant Design: forcer full-width sur mobile */
+.ant-picker, .ant-select, .ant-input, .ant-btn-block { max-width: 100% !important; }
+
+/* Éviter tout overflow horizontal */
+.page, .app-shell { overflow-x: hidden; }
+
+/* Textes longs dans les cards */
+.ant-card-body { word-break: break-word; }
+
+/* Tabs scrollables sur petit écran */
+.ant-tabs-nav-list { overflow-x: auto; }
+
+/* Descriptions table responsive */
+.ant-descriptions-item-label,
+.ant-descriptions-item-content { font-size: 0.82rem !important; }
+
+/* DatePicker: keyboard n'agrandit pas la page */
+input[type="text"], input[type="search"] {
+  font-size: 16px !important; /* évite zoom iOS */
+}
+
+/* Sheet modal: toujours pleine largeur */
+.sheet-modal { width: 100%; box-sizing: border-box; }
+
+/* Stats row dans Settings: pas de débordement */
+.ant-statistic-content-value { font-size: clamp(1rem, 4vw, 1.5rem) !important; }
+
+/* PlantCard: empêcher sélection de texte accidentelle pendant swipe */
+.plant-card-v2 { -webkit-user-select: none; user-select: none; }
+
+/* Bottom nav: safe area pour iPhone */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+}
+
+/* Recharts responsive dans un container à 100% */
+.recharts-responsive-container { min-width: 0; }
+
+/* Scrollbar masquée partout sur mobile */
+@media (pointer: coarse) {
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
+}
+
+/* Sur très petits écrans (< 360px) */
+@media (max-width: 360px) {
+  .app-shell {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .pcv2-name { font-size: 0.9rem; }
+  .bottom-item .label { font-size: 0.62rem; }
+}
 .plant-card:nth-child(2) { animation-delay: 0.1s; }
 .plant-card:nth-child(3) { animation-delay: 0.15s; }
 .plant-card:nth-child(4) { animation-delay: 0.2s; }
