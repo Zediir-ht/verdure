@@ -17,7 +17,7 @@ import {
 } from 'recharts'
 import PlantEnvironment from '../components/plants/PlantEnvironment'
 import { calculateHydricBalance } from '../services/hydricBalance'
-import { fetchWateringLogs } from '../services/supabase'
+import { fetchWateringLogs, updateWateringLog, insertWateringLog } from '../services/supabase'
 import { uploadPlantPhoto } from '../services/plants'
 import { usePlantsStore } from '../store/usePlantsStore'
 
@@ -282,6 +282,18 @@ export default function PlantDetail() {
                         if (!date) { setEditingWaterDate(false); return }
                         const iso = date.toISOString()
                         updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
+                        // Écraser la date du log le plus récent (ou en créer un nouveau)
+                        if (wateringLogs.length > 0) {
+                          const latest = wateringLogs[0]
+                          updateWateringLog(latest.id, iso).catch(() => {})
+                          setWateringLogs((prev) =>
+                            prev.map((l) => (l.id === latest.id ? { ...l, watered_at: iso } : l))
+                          )
+                        } else {
+                          insertWateringLog(plant.id, 'Correction manuelle', null, iso)
+                            .then((log) => { if (log) setWateringLogs([log]) })
+                            .catch(() => {})
+                        }
                         setEditingWaterDate(false)
                         msgApi.success('Date d\'arrosage mise à jour !')
                       }}

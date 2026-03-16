@@ -108,12 +108,25 @@ export async function fetchWateringLogs(plantId) {
   return data ?? []
 }
 
-export async function insertWateringLog(plantId, note = '', amount_ml = null) {
+export async function insertWateringLog(plantId, note = '', amount_ml = null, watered_at = null) {
   if (!supabase) return null
   await authReady()
   const { data, error } = await supabase
     .from('watering_logs')
-    .insert([{ plant_id: plantId, watered_at: new Date().toISOString(), note, amount_ml }])
+    .insert([{ plant_id: plantId, watered_at: watered_at ?? new Date().toISOString(), note, amount_ml }])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateWateringLog(logId, watered_at) {
+  if (!supabase) return null
+  await authReady()
+  const { data, error } = await supabase
+    .from('watering_logs')
+    .update({ watered_at })
+    .eq('id', logId)
     .select()
     .single()
   if (error) throw error
