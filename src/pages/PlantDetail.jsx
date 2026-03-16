@@ -180,8 +180,18 @@ export default function PlantDetail() {
     )
   }
 
+  const reloadLogs = () => fetchWateringLogs(id).then(setWateringLogs).catch(() => {})
+
   const handleWater = () => {
+    const nowIso = new Date().toISOString()
     waterPlant(plant.id)
+    // Mise à jour optimiste immédiate
+    setWateringLogs((prev) => [
+      { id: `tmp-${Date.now()}`, plant_id: plant.id, watered_at: nowIso, note: 'Arrosage manuel' },
+      ...prev,
+    ])
+    // Recharge depuis la DB pour avoir le vrai ID
+    setTimeout(reloadLogs, 1500)
     msgApi.success(`💧 ${plant.name} arrosée !`)
   }
 
@@ -283,18 +293,24 @@ export default function PlantDetail() {
                         const iso = date.toISOString()
                         updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
                         // Supprimer le log le plus récent et en créer un nouveau avec la bonne date
-                        if (wateringLogs.length > 0) {
-                          const latest = wateringLogs[0]
-                          deleteWateringLog(latest.id).catch(() => {})
-                          insertWateringLog(plant.id, latest.note ?? '', null, iso).catch(() => {})
-                          setWateringLogs((prev) =>
-                            prev.map((l) => (l.id === latest.id ? { ...l, watered_at: iso } : l))
-                          )
-                        } else {
-                          insertWateringLog(plant.id, 'Correction manuelle', null, iso)
-                            .then((log) => { if (log) setWateringLogs([log]) })
-                            .catch(() => {})
+                        const doUpdate = async () => {
+                          if (wateringLogs.length > 0) {
+                            const latest = wateringLogs[0]
+                            await deleteWateringLog(latest.id).catch(() => {})
+                            await insertWateringLog(plant.id, latest.note ?? '', null, iso).catch(() => {})
+                          } else {
+                            await insertWateringLog(plant.id, 'Correction manuelle', null, iso).catch(() => {})
+                          }
+                          // Recharge depuis la DB pour refléter l'état réel
+                          reloadLogs()
                         }
+                        // Mise à jour optimiste immédiate de l'affichage
+                        setWateringLogs((prev) =>
+                          prev.length > 0
+                            ? prev.map((l, i) => (i === 0 ? { ...l, watered_at: iso } : l))
+                            : [{ id: `tmp-${Date.now()}`, plant_id: plant.id, watered_at: iso, note: '' }]
+                        )
+                        doUpdate()
                         setEditingWaterDate(false)
                         msgApi.success('Date d\'arrosage mise à jour !')
                       }}
