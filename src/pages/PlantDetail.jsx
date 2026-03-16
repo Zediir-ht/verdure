@@ -278,10 +278,10 @@ export default function PlantDetail() {
                       disabledDate={(d) => d && d.isAfter(dayjs())}
                       format="DD/MM/YYYY"
                       autoFocus
-                      onChange={async (date) => {
+                      onChange={(date) => {
                         if (!date) { setEditingWaterDate(false); return }
                         const iso = date.toISOString()
-                        await updatePlant(plant.id, { last_watered: iso })
+                        updatePlant(plant.id, { last_watered: iso }) // optimiste, pas d'await
                         setEditingWaterDate(false)
                         msgApi.success('Date d\'arrosage mise à jour !')
                       }}
