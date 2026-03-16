@@ -154,16 +154,26 @@ export default function PlantDetail() {
     return calculateHydricBalance(plant, weather?.pastDays ?? [], weather?.daily ?? [])
   }, [plant, weather])
 
+  // Extrait la date locale (YYYY-MM-DD) d'un ISO string, sans décalage UTC
+  const toLocalDate = (iso) => {
+    if (!iso) return null
+    const d = new Date(iso)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
   const chartData = useMemo(() => {
     const days7 = [...new Array(7)].map((_, i) => {
       const d = new Date()
       d.setDate(d.getDate() - 6 + i)
-      return d.toISOString().slice(0, 10)
+      return toLocalDate(d.toISOString())
     })
     return days7.map((dateStr) => {
-      const log = wateringLogs.find((l) => l.watered_at?.slice(0, 10) === dateStr)
+      const log = wateringLogs.find((l) => toLocalDate(l.watered_at) === dateStr)
       return {
-        date: new Date(dateStr).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
+        date: new Date(dateStr + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' }),
         watered: log ? 1 : 0,
       }
     })
@@ -291,7 +301,8 @@ export default function PlantDetail() {
                         autoFocus
                         onChange={(date) => {
                           if (!date) return
-                          const iso = date.toISOString()
+                          // Midi heure locale pour éviter le décalage UTC
+                          const iso = date.hour(12).minute(0).second(0).millisecond(0).toISOString()
                           updatePlant(plant.id, { last_watered: iso, lastWatered: iso })
                           const doUpdate = async () => {
                             if (wateringLogs.length > 0) {
